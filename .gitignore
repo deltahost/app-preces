@@ -11,6 +11,7 @@ dist-test-router/
 dist-test-safe-area/
 dist-test-tts/
 web-build/
+deployment/
 expo-env.d.ts
 
 # Native
