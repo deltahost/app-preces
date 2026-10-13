@@ -16,7 +16,7 @@ function admin_header(string $title): void
 
 function admin_footer(): void
 {
-    ?></main><footer>Painel de conteúdo · Preces e Orações</footer></body></html><?php
+    ?></main><footer>Painel de conteúdo · Preces e Orações</footer><script src="assets/ffmpeg/ffmpeg.js"></script><script src="assets/audio-converter.js"></script></body></html><?php
 }
 
 function notice(): void
