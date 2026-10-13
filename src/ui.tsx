@@ -10,8 +10,8 @@ export function Icon({ name, size=22, color }: { name:any; size?:number; color:s
   return <Ionicons name={name} size={size} color={color}/>;
 }
 
-export function SectionTitle({ title, action, p }: { title:string; action?:string; p:Palette }) {
-  return <View style={s.head}><Text style={[s.title,{color:p.text}]}>{title}</Text>{action && <Pressable><Text style={[s.action,{color:p.primary}]}>{action}</Text></Pressable>}</View>;
+export function SectionTitle({ title, action, onAction, p }: { title:string; action?:string; onAction?:()=>void; p:Palette }) {
+  return <View style={s.head}><Text style={[s.title,{color:p.text}]}>{title}</Text>{action && <Pressable accessibilityRole="button" hitSlop={10} onPress={onAction}><Text style={[s.action,{color:p.primary}]}>{action}</Text></Pressable>}</View>;
 }
 
 export function Ad({ p }: { p:Palette }) {
