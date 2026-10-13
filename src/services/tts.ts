@@ -4,6 +4,8 @@ import { createAudioPlayer, setAudioModeAsync, type AudioPlayer, type AudioStatu
 export type NarrationVoice = 'female' | 'male';
 export type NarrationLocale = 'pt-BR' | 'en-US' | 'es-ES' | 'fr-FR' | 'it-IT';
 export type PlaybackPhase = 'idle' | 'loading' | 'playing' | 'error';
+const DEFAULT_TTS_API_URL = 'https://preces-edge-tts.onrender.com';
+const TTS_WAKE_TIMEOUT_MS = 60_000;
 
 export class NarrationCancelledError extends Error {
   constructor() {
@@ -56,12 +58,13 @@ export async function speakOnDevice(text: string, voice: NarrationVoice = 'femal
 }
 
 // Contrato para o backend de produção. Nunca coloque credenciais do Azure/Edge no app.
-export async function requestPremiumNarration(apiUrl: string, token: string | undefined, text: string, voice: NarrationVoice, locale: NarrationLocale) {
+export async function requestPremiumNarration(apiUrl: string, token: string | undefined, text: string, voice: NarrationVoice, locale: NarrationLocale, signal?: AbortSignal) {
   const profile = NARRATION_PROFILES[voice];
   const response = await fetch(`${apiUrl}/v1/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify({ text, locale, gender: voice, voice: profile.azureVoice, rate: profile.rate, delivery: 'narrative', format: 'audio-24khz-48kbitrate-mono-mp3' }),
+    signal,
   });
   if (!response.ok) throw new Error('Não foi possível gerar a narração.');
   return response.json() as Promise<{ audioUrl: string; expiresAt: string }>;
@@ -157,15 +160,26 @@ export async function playAudioUrl(audioUrl: string, onPhase?: (phase: PlaybackP
 }
 
 export async function speakNarration(text: string, voice: NarrationVoice = 'female', locale: NarrationLocale = 'pt-BR', onPhase?: (phase: PlaybackPhase) => void) {
-  const apiUrl = process.env.EXPO_PUBLIC_TTS_API_URL?.replace(/\/$/, '');
-  if (!apiUrl) return speakOnDevice(text, voice, locale, onPhase);
+  const apiUrl = (process.env.EXPO_PUBLIC_TTS_API_URL || DEFAULT_TTS_API_URL).replace(/\/$/, '');
+  await stopNarration();
+  activePhaseCallback = onPhase ?? null;
+  onPhase?.('loading');
+  const controller = new AbortController();
+  let cancelled = false;
+  const cancelRequest = () => { cancelled = true; controller.abort(); };
+  activeCancel = cancelRequest;
+  const timeout = setTimeout(() => controller.abort(), TTS_WAKE_TIMEOUT_MS);
 
   try {
-    onPhase?.('loading');
     const demoToken = process.env.EXPO_PUBLIC_TTS_API_TOKEN;
-    const result = await requestPremiumNarration(apiUrl, demoToken, text, voice, locale);
+    const result = await requestPremiumNarration(apiUrl, demoToken, text, voice, locale, controller.signal);
+    clearTimeout(timeout);
+    if (activeCancel === cancelRequest) activeCancel = null;
     await playAudioUrl(result.audioUrl, onPhase);
-  } catch {
+  } catch (error) {
+    clearTimeout(timeout);
+    if (activeCancel === cancelRequest) activeCancel = null;
+    if (cancelled) throw new NarrationCancelledError();
     await speakOnDevice(text, voice, locale, onPhase);
   }
 }
