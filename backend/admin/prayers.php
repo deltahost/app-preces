@@ -17,18 +17,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $body = trim((string) ($_POST['body'] ?? ''));
     $slug = slugify(trim((string) ($_POST['slug'] ?? '')) ?: $title);
     if ($title === '' || $body === '') {
-        redirect('prayers.php?error=' . rawurlencode('Informe o título e o texto da oração.'));
+        $_SESSION['prayer_form_values'] = array_merge($_POST, ['id' => $id, 'slug' => $slug]);
+        $_SESSION['flash_error'] = 'Informe o título e o texto da oração.';
+        redirect('prayers.php?' . ($id > 0 ? 'edit=' . $id : 'new=1'));
     }
     $publishedAt = trim((string) ($_POST['published_at'] ?? ''));
     $publishedAt = $publishedAt !== '' ? str_replace('T', ' ', $publishedAt) . ':00' : null;
     $audioUrl = trim((string) ($_POST['audio_url'] ?? ''));
+    $formValues = [
+        'id' => $id,
+        'category_id' => (int) ($_POST['category_id'] ?? 0) ?: null,
+        'title' => $title,
+        'slug' => $slug,
+        'excerpt' => trim((string) ($_POST['excerpt'] ?? '')),
+        'body' => $body,
+        'image_url' => trim((string) ($_POST['image_url'] ?? '')),
+        'audio_url' => $audioUrl,
+        'is_premium' => isset($_POST['is_premium']) ? 1 : 0,
+        'is_featured' => isset($_POST['is_featured']) ? 1 : 0,
+        'is_published' => isset($_POST['is_published']) ? 1 : 0,
+        'sort_order' => (int) ($_POST['sort_order'] ?? 0),
+        'published_at' => $publishedAt,
+    ];
     try {
         $uploadedUrl = store_audio_upload();
         if ($uploadedUrl !== null) {
             $audioUrl = $uploadedUrl;
+            $formValues['audio_url'] = $uploadedUrl;
         }
     } catch (RuntimeException $error) {
-        redirect('prayers.php?' . ($id > 0 ? 'edit=' . $id . '&' : 'new=1&') . 'error=' . rawurlencode($error->getMessage()));
+        $_SESSION['prayer_form_values'] = $formValues;
+        $_SESSION['flash_error'] = $error->getMessage();
+        redirect('prayers.php?' . ($id > 0 ? 'edit=' . $id : 'new=1'));
     }
     $values = [
         (int) ($_POST['category_id'] ?? 0) ?: null,
@@ -54,7 +74,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $statement->execute($values);
         redirect('prayers.php?ok=' . rawurlencode('Oração salva.'));
     } catch (PDOException) {
-        redirect('prayers.php?error=' . rawurlencode('Não foi possível salvar. Verifique se o slug já existe.'));
+        $_SESSION['prayer_form_values'] = $formValues;
+        $_SESSION['flash_error'] = 'Não foi possível salvar. Verifique se o slug já existe.';
+        redirect('prayers.php?' . ($id > 0 ? 'edit=' . $id : 'new=1'));
     }
 }
 
@@ -64,7 +86,12 @@ if (!empty($_GET['edit'])) {
     $statement->execute([(int) $_GET['edit']]);
     $editing = $statement->fetch() ?: null;
 }
-$showForm = isset($_GET['new']) || $editing;
+$preservedValues = $_SESSION['prayer_form_values'] ?? null;
+unset($_SESSION['prayer_form_values']);
+if (is_array($preservedValues)) {
+    $editing = array_merge($editing ?: [], $preservedValues);
+}
+$showForm = isset($_GET['new']) || $editing || $preservedValues;
 $categories = db()->query('SELECT id, name FROM categories ORDER BY sort_order, name')->fetchAll();
 $prayers = db()->query('SELECT p.*, c.name AS category_name FROM prayers p LEFT JOIN categories c ON c.id=p.category_id ORDER BY p.created_at DESC')->fetchAll();
 admin_header('Orações e preces'); notice();
@@ -73,7 +100,7 @@ admin_header('Orações e preces'); notice();
 <?php if ($showForm): ?><section class="card" style="margin-bottom:18px"><h2><?= $editing ? 'Editar oração' : 'Nova oração' ?></h2><form method="post" enctype="multipart/form-data" class="form-grid"><input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>"><input type="hidden" name="id" value="<?= (int) ($editing['id'] ?? 0) ?>">
 <div><label>Título</label><input name="title" required value="<?= e($editing['title'] ?? '') ?>"></div><div><label>Slug</label><input name="slug" value="<?= e($editing['slug'] ?? '') ?>" placeholder="gerado automaticamente"></div>
 <div><label>Categoria</label><select name="category_id"><option value="">Sem categoria</option><?php foreach ($categories as $category): ?><option value="<?= (int) $category['id'] ?>" <?= (int) ($editing['category_id'] ?? 0) === (int) $category['id'] ? 'selected' : '' ?>><?= e($category['name']) ?></option><?php endforeach; ?></select></div><div><label>Ordem</label><input name="sort_order" type="number" value="<?= (int) ($editing['sort_order'] ?? 0) ?>"></div>
-<div class="full"><label>Resumo</label><input name="excerpt" maxlength="500" value="<?= e($editing['excerpt'] ?? '') ?>"></div><div class="full"><label>Texto completo</label><textarea name="body" required><?= e($editing['body'] ?? '') ?></textarea></div><div class="full"><label>URL da imagem</label><input name="image_url" type="url" value="<?= e($editing['image_url'] ?? '') ?>" placeholder="https://..."></div><div class="full"><label>Link do áudio personalizado</label><input name="audio_url" type="url" value="<?= e($editing['audio_url'] ?? '') ?>" placeholder="https://.../narracao.mp3"><small class="muted">Opcional. Cole um endereço existente ou envie um arquivo abaixo.</small></div><div class="full" data-audio-converter><label>Enviar áudio da oração</label><input data-audio-file name="audio_file" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.webm"><div class="audio-tools"><select data-audio-quality aria-label="Qualidade do MP3"><option value="48k">Econômica · 48 kbps</option><option value="64k" selected>Recomendada · 64 kbps</option><option value="96k">Alta · 96 kbps</option></select><button data-audio-convert class="button secondary" type="button">Converter e comprimir para MP3</button></div><span data-audio-status class="audio-status">A conversão acontece neste navegador. O arquivo só é enviado quando você salvar.</span></div>
+<div class="full"><label>Resumo</label><input name="excerpt" maxlength="500" value="<?= e($editing['excerpt'] ?? '') ?>"></div><div class="full"><label>Texto completo</label><textarea name="body" required><?= e($editing['body'] ?? '') ?></textarea></div><div class="full"><label>URL da imagem</label><input name="image_url" type="url" value="<?= e($editing['image_url'] ?? '') ?>" placeholder="https://..."></div><div class="full"><label>Link do áudio personalizado</label><input name="audio_url" type="url" value="<?= e($editing['audio_url'] ?? '') ?>" placeholder="https://.../narracao.mp3"><small class="muted">Opcional. Cole um endereço existente ou envie um arquivo abaixo.</small></div><div class="full" data-audio-converter><label>Enviar áudio da oração</label><input data-audio-file name="audio_file" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.webm"><div class="audio-tools"><select data-audio-quality aria-label="Qualidade do MP3"><option value="48k">Econômica · 48 kbps</option><option value="64k" selected>Recomendada · 64 kbps</option><option value="96k">Alta · 96 kbps</option></select><button data-audio-convert class="button secondary" type="button">Converter e comprimir para MP3</button></div><div data-audio-progress class="audio-progress" hidden><span></span></div><span data-audio-status class="audio-status">A conversão acontece neste navegador. O arquivo só é enviado quando você salvar.</span></div>
 <div><label>Publicar a partir de</label><input name="published_at" type="datetime-local" value="<?= !empty($editing['published_at']) ? e(date('Y-m-d\TH:i', strtotime($editing['published_at']))) : '' ?>"></div><div></div>
 <label class="check"><input type="checkbox" name="is_published" <?= !empty($editing['is_published']) ? 'checked' : '' ?>> Publicada</label><label class="check"><input type="checkbox" name="is_premium" <?= !empty($editing['is_premium']) ? 'checked' : '' ?>> Conteúdo Premium</label><label class="check"><input type="checkbox" name="is_featured" <?= !empty($editing['is_featured']) ? 'checked' : '' ?>> Destaque</label>
 <div class="full actions"><button class="button" type="submit">Salvar oração</button><a class="button secondary" href="prayers.php">Cancelar</a></div></form></section><?php endif; ?>

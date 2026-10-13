@@ -1,0 +1,17 @@
+.audio-progress {
+  width: 100%;
+  height: 10px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8dfd5;
+}
+
+.audio-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #76543f, #bd8b2f);
+  transition: width 180ms ease;
+}
