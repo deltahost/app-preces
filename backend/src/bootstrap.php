@@ -84,6 +84,13 @@ function redirect(string $path): never
 function slugify(string $value): string
 {
     $value = trim(mb_strtolower($value, 'UTF-8'));
+    $value = strtr($value, [
+        'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a',
+        'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+        'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
+        'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o',
+        'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'ç' => 'c', 'ñ' => 'n',
+    ]);
     $converted = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
     $value = $converted !== false ? $converted : $value;
     $value = preg_replace('/[^a-z0-9]+/', '-', $value) ?? '';
@@ -99,4 +106,3 @@ function json_response(mixed $data, int $status = 200): never
     echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
-
