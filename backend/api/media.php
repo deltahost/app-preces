@@ -1,5 +1,6 @@
 <?php
 require_once dirname(__DIR__) . '/src/bootstrap.php';
+ensure_media_schema();
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_response(['error' => 'Método não permitido.'], 405);
 }
