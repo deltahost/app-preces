@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Prayer } from '../data';
 import { PlaybackPhase, playAudioUrl, speakNarration } from './tts';
 
-const FREE_NARRATION_KEY = '@preces/free-narration-date';
+const FREE_NARRATION_KEY = '@preces/free-narration-date-v2';
 
 export class DailyNarrationLimitError extends Error {
   constructor() {

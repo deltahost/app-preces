@@ -32,7 +32,7 @@ export default function App(){
  };
  const openPrayer=async(prayer:Prayer)=>{setReader(prayer);if(prayer.id.startsWith('published-'))setRecentPrayerIds(await recordPrayerAccess(prayer.id))};
  const subscribe=(plan:'monthly'|'annual')=>{setPremium(true);persist({premium:true});setPremiumOpen(false);Alert.alert('Premium ativado',`Plano ${plan==='annual'?'anual':'mensal'} ativado neste protótipo.`)};
- const reset=()=>Alert.alert('Reiniciar o app?','Suas preferências, histórico e orações pessoais serão apagados.',[{text:'Cancelar'},{text:'Reiniciar',style:'destructive',onPress:async()=>{await AsyncStorage.multiRemove([KEY,'@preces/free-narration-date','@preces/recent-prayers-v1']);setPrayersRaw(initialPrayers);setRecentPrayerIds([]);setPremium(false);setDarkMode(false);setReminder(true);setDrawer(false)}}]);
+ const reset=()=>Alert.alert('Reiniciar o app?','Suas preferências, histórico e orações pessoais serão apagados.',[{text:'Cancelar'},{text:'Reiniciar',style:'destructive',onPress:async()=>{await AsyncStorage.multiRemove([KEY,'@preces/free-narration-date','@preces/free-narration-date-v2','@preces/recent-prayers-v1']);setPrayersRaw(initialPrayers);setRecentPrayerIds([]);setPremium(false);setDarkMode(false);setReminder(true);setDrawer(false)}}]);
  const toggle=()=>{if(!reader)return;const updated={...reader,favorite:!reader.favorite};setReader(updated);if(prayers.some(x=>x.id===reader.id))setPrayers(prayers.map(x=>x.id===reader.id?updated:x))};
  const tabs=useMemo(()=>[
   {key:'home',icon:'chatbubble-ellipses-outline',active:'chatbubble-ellipses',label:'Comentar',main:false},
