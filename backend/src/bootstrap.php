@@ -145,6 +145,71 @@ function ensure_prayer_audio_schema(): void
     }
 }
 
+function ensure_bible_schema(): void
+{
+    db()->exec(<<<'SQL'
+CREATE TABLE IF NOT EXISTS bible_books (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    slug VARCHAR(140) NOT NULL UNIQUE,
+    abbreviation VARCHAR(20) NOT NULL,
+    testament VARCHAR(8) NOT NULL,
+    book_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    is_published TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_bible_books_public (testament, is_published, book_order)
+) ENGINE=InnoDB
+SQL);
+
+    db()->exec(<<<'SQL'
+CREATE TABLE IF NOT EXISTS bible_chapters (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT UNSIGNED NOT NULL,
+    chapter_number SMALLINT UNSIGNED NOT NULL,
+    title VARCHAR(180) NULL,
+    audio_url VARCHAR(2048) NULL,
+    is_published TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_bible_chapter_book FOREIGN KEY (book_id) REFERENCES bible_books(id) ON DELETE CASCADE,
+    UNIQUE KEY uniq_bible_chapter (book_id, chapter_number),
+    INDEX idx_bible_chapters_public (book_id, is_published, chapter_number)
+) ENGINE=InnoDB
+SQL);
+
+    db()->exec(<<<'SQL'
+CREATE TABLE IF NOT EXISTS bible_verses (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    chapter_id BIGINT UNSIGNED NOT NULL,
+    verse_number SMALLINT UNSIGNED NOT NULL,
+    verse_text TEXT NOT NULL,
+    audio_url VARCHAR(2048) NULL,
+    is_published TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_bible_verse_chapter FOREIGN KEY (chapter_id) REFERENCES bible_chapters(id) ON DELETE CASCADE,
+    UNIQUE KEY uniq_bible_verse (chapter_id, verse_number),
+    INDEX idx_bible_verses_public (chapter_id, is_published, verse_number)
+) ENGINE=InnoDB
+SQL);
+
+    db()->exec(<<<'SQL'
+CREATE TABLE IF NOT EXISTS bible_glossary (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    term VARCHAR(140) NOT NULL,
+    slug VARCHAR(160) NOT NULL UNIQUE,
+    definition TEXT NOT NULL,
+    related_reference VARCHAR(180) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_published TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_bible_glossary_public (is_published, sort_order, term)
+) ENGINE=InnoDB
+SQL);
+}
+
 function ensure_ai_schema(): void
 {
     db()->exec(<<<'SQL'

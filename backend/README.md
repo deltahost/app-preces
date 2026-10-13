@@ -1,6 +1,6 @@
 # Painel de conteúdo
 
-Backend PHP 8 + MySQL para administrar categorias e orações do aplicativo.
+Backend PHP 8 + MySQL para administrar categorias, orações, mídias e a Bíblia do aplicativo.
 
 ## Instalação
 
@@ -25,6 +25,14 @@ O arquivo `config.php` é ignorado pelo Git e não deve ser enviado ao GitHub.
 - `GET /api/media-categories.php`
 - `GET /api/media.php?type=video`
 - `GET /api/media.php?type=audio&category=meditacao`
+- `GET /api/bible.php`
+- `GET /api/bible.php?testament=old`
+- `GET /api/bible.php?book=genesis`
+- `GET /api/bible.php?book=genesis&chapter=1`
+- `GET /api/bible.php?q=esperança` (busca por palavra)
+- `GET /api/bible.php?q=João%203:16` (acesso por referência)
+- `GET /api/bible.php?glossary=1`
+- `GET /api/bible.php?glossary=alianca`
 - `POST /api/bible-chat.php`
 
 ## Chaves de IA
