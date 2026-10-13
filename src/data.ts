@@ -1,4 +1,4 @@
-export type Prayer = { id: string; title: string; text: string; favorite?: boolean; audioUrl?: string };
+export type Prayer = { id: string; title: string; text: string; favorite?: boolean; audioUrl?: string; imageUrl?: string };
 
 export const verses = [
   ['Domingo', 'Este é o dia que o Senhor fez; alegremo-nos e exultemos nele.', 'Salmos 118:24'],

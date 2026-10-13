@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, ImageBackground, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +13,7 @@ import { loadFavoritePrayerIds, loadPublishedContent, PublishedPrayer, recordPra
 import { DailyNarrationLimitError, playPrayerNarration } from '../../services/prayerNarration';
 import { NarrationCancelledError, PlaybackPhase } from '../../services/tts';
 import { Text } from '../../typography';
+import { categoryImage } from '../../visuals';
 
 type StoredState = { dark?: boolean; premium?: boolean };
 
@@ -90,15 +92,20 @@ export default function CategoryScreen() {
         <View style={styles.back} />
       </View>
 
+      <ImageBackground source={{ uri: categoryImage(slug) }} imageStyle={styles.heroImage} style={styles.hero}>
+        <LinearGradient colors={['rgba(37,29,23,.08)', 'rgba(37,29,23,.82)']} style={styles.heroShade}>
+          <View style={styles.heroPill}><Icon name="sparkles" size={14} color="#F4D7A0" /><Text style={styles.heroPillText}>MOMENTO DE FÉ</Text></View>
+          <Text style={styles.heroTitle}>Encontre a oração certa para este momento</Text>
+        </LinearGradient>
+      </ImageBackground>
+
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={p.primary} size="large" /><Text style={[styles.emptyText, { color: p.muted }]}>Carregando orações...</Text></View>
       ) : (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
           {prayers.length ? prayers.map(prayer => (
             <Pressable key={prayer.id} onPress={() => openPrayer(prayer)} style={({ pressed }) => [styles.card, { backgroundColor: p.surface }, pressed && styles.pressed]}>
-              <View style={[styles.icon, { backgroundColor: p.surface2 }]}>
-                <Icon name={prayer.premium ? 'lock-closed-outline' : 'book-outline'} color={p.gold} />
-              </View>
+              {prayer.imageUrl?<ImageBackground source={{uri:prayer.imageUrl}} imageStyle={styles.iconImage} style={[styles.icon,{backgroundColor:p.surface2}]}><View style={styles.iconShade}><Icon name={prayer.premium?'lock-closed-outline':'book-outline'} color="#fff"/></View></ImageBackground>:<View style={[styles.icon,{backgroundColor:p.surface2}]}><Icon name={prayer.premium?'lock-closed-outline':'book-outline'} color={p.gold}/></View>}
               <View style={styles.copy}>
                 <Text style={[styles.cardTitle, { color: p.text }]}>{prayer.title}</Text>
                 <Text numberOfLines={3} style={[styles.excerpt, { color: p.muted }]}>{prayer.excerpt || prayer.text}</Text>
@@ -131,10 +138,18 @@ const styles = StyleSheet.create({
   heading: { flex: 1, alignItems: 'center', paddingHorizontal: 10 },
   title: { fontSize: 21, fontWeight: '900' },
   subtitle: { fontSize: 11, marginTop: 2 },
+  hero: { height: 142, marginHorizontal: 18, borderRadius: 20, overflow: 'hidden', backgroundColor: '#72513B' },
+  heroImage: { borderRadius: 20 },
+  heroShade: { flex: 1, padding: 18, justifyContent: 'flex-end' },
+  heroPill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(34,25,19,.42)', borderRadius: 11, paddingHorizontal: 8, paddingVertical: 5 },
+  heroPillText: { color: '#F8E6C4', fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  heroTitle: { color: '#fff', fontSize: 17, lineHeight: 23, fontWeight: '800', maxWidth: '85%', marginTop: 8, textShadowColor: 'rgba(0,0,0,.35)', textShadowRadius: 5 },
   list: { padding: 18, paddingBottom: 36, gap: 12 },
   card: { borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, ...shadow },
   pressed: { opacity: 0.72, transform: [{ scale: 0.985 }] },
   icon: { width: 48, height: 48, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  iconImage: { borderRadius: 15 },
+  iconShade: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(30,22,17,.3)' },
   copy: { flex: 1 },
   cardTitle: { fontSize: 16, fontWeight: '800', lineHeight: 21 },
   excerpt: { fontSize: 12, lineHeight: 18, marginTop: 4 },
