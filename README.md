@@ -21,6 +21,7 @@ Abra no Expo Go para testar em um celular. Para gerar versões de loja, configur
 - Menu lateral, tema claro/escuro, lembrete, horário e links institucionais preparados.
 - Página de venda Premium com planos mensal e anual, benefícios, restauração e cancelamento.
 - Bloqueios visuais de recursos Premium e estado de assinatura simulado.
+- Base do painel PHP/MySQL para administrar categorias e orações em `backend/`.
 
 ## Vozes de narração
 
