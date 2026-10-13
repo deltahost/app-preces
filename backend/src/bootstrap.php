@@ -145,6 +145,82 @@ function ensure_prayer_audio_schema(): void
     }
 }
 
+function ensure_ai_schema(): void
+{
+    db()->exec(<<<'SQL'
+CREATE TABLE IF NOT EXISTS api_credentials (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    provider VARCHAR(24) NOT NULL,
+    label VARCHAR(120) NOT NULL,
+    encrypted_key MEDIUMTEXT NOT NULL,
+    key_suffix VARCHAR(8) NOT NULL,
+    priority INT NOT NULL DEFAULT 100,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    cooldown_until DATETIME NULL,
+    failure_count INT NOT NULL DEFAULT 0,
+    last_error VARCHAR(500) NULL,
+    last_used_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_api_credentials_rotation (provider, is_enabled, cooldown_until, priority)
+) ENGINE=InnoDB
+SQL);
+
+    db()->exec(<<<'SQL'
+CREATE TABLE IF NOT EXISTS bible_chat_usage (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    installation_hash CHAR(64) NOT NULL,
+    usage_date DATE NOT NULL,
+    request_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_bible_chat_daily (installation_hash, usage_date)
+) ENGINE=InnoDB
+SQL);
+}
+
+function credential_cipher_key(): string
+{
+    $secret = trim((string) config('app', 'secret_key', ''));
+    if ($secret === '') {
+        // Compatibilidade com instalações existentes. Recomenda-se definir app.secret_key no config.php.
+        $secret = (string) config('app', 'setup_token', '') . '|' . (string) config('database', 'password', '');
+    }
+    if (strlen($secret) < 24) {
+        throw new RuntimeException('Defina app.secret_key no config.php com pelo menos 24 caracteres aleatórios.');
+    }
+    return hash('sha256', $secret, true);
+}
+
+function encrypt_credential(string $plainText): string
+{
+    if (!function_exists('openssl_encrypt')) {
+        throw new RuntimeException('A extensão OpenSSL precisa estar ativa na hospedagem.');
+    }
+    $iv = random_bytes(12);
+    $tag = '';
+    $cipherText = openssl_encrypt($plainText, 'aes-256-gcm', credential_cipher_key(), OPENSSL_RAW_DATA, $iv, $tag);
+    if ($cipherText === false) {
+        throw new RuntimeException('Não foi possível proteger a chave.');
+    }
+    return base64_encode($iv . $tag . $cipherText);
+}
+
+function decrypt_credential(string $payload): string
+{
+    $decoded = base64_decode($payload, true);
+    if ($decoded === false || strlen($decoded) < 29) {
+        throw new RuntimeException('Chave armazenada inválida. Cadastre-a novamente.');
+    }
+    $iv = substr($decoded, 0, 12);
+    $tag = substr($decoded, 12, 16);
+    $plainText = openssl_decrypt(substr($decoded, 28), 'aes-256-gcm', credential_cipher_key(), OPENSSL_RAW_DATA, $iv, $tag);
+    if ($plainText === false) {
+        throw new RuntimeException('Não foi possível abrir a chave. Verifique app.secret_key.');
+    }
+    return $plainText;
+}
+
 function store_audio_upload(string $field = 'audio_file'): ?string
 {
     if (empty($_FILES[$field]) || ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
@@ -185,6 +261,18 @@ function json_response(mixed $data, int $status = 200): never
     header('Content-Type: application/json; charset=utf-8');
     header('Access-Control-Allow-Origin: *');
     header('Cache-Control: public, max-age=60');
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+function private_json_response(mixed $data, int $status = 200): never
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Headers: Content-Type');
+    header('Access-Control-Allow-Methods: POST, OPTIONS');
+    header('Cache-Control: no-store, private');
     echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }

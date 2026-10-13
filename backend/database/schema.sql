@@ -79,6 +79,33 @@ CREATE TABLE IF NOT EXISTS media_items (
     INDEX idx_media_category (category_id, is_published)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS api_credentials (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    provider VARCHAR(24) NOT NULL,
+    label VARCHAR(120) NOT NULL,
+    encrypted_key MEDIUMTEXT NOT NULL,
+    key_suffix VARCHAR(8) NOT NULL,
+    priority INT NOT NULL DEFAULT 100,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    cooldown_until DATETIME NULL,
+    failure_count INT NOT NULL DEFAULT 0,
+    last_error VARCHAR(500) NULL,
+    last_used_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_api_credentials_rotation (provider, is_enabled, cooldown_until, priority)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS bible_chat_usage (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    installation_hash CHAR(64) NOT NULL,
+    usage_date DATE NOT NULL,
+    request_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_bible_chat_daily (installation_hash, usage_date)
+) ENGINE=InnoDB;
+
 INSERT INTO categories (name, slug, icon, color, sort_order) VALUES
 ('Pessoal', 'pessoal', 'person-outline', '#7B5C45', 10),
 ('Família', 'familia', 'people-outline', '#9B6C72', 20),
