@@ -3,6 +3,7 @@ import { categories as localCategories, Prayer } from '../data';
 
 const CONTENT_API_URL = (process.env.EXPO_PUBLIC_CONTENT_API_URL ?? 'https://preces.criandoconteudo.com.br/api').replace(/\/$/, '');
 const CACHE_KEY = '@preces/published-content-v1';
+const RECENT_PRAYERS_KEY = '@preces/recent-prayers-v1';
 
 export type ContentCategory = {
   id: number;
@@ -147,4 +148,21 @@ export async function loadPublishedContent(): Promise<PublishedContent> {
     }
     return localFallback;
   }
+}
+
+export async function loadRecentPrayerIds(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(RECENT_PRAYERS_KEY);
+    const ids = raw ? JSON.parse(raw) : [];
+    return Array.isArray(ids) ? ids.filter(id => typeof id === 'string').slice(0, 3) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function recordPrayerAccess(prayerId: string): Promise<string[]> {
+  const current = await loadRecentPrayerIds();
+  const next = [prayerId, ...current.filter(id => id !== prayerId)].slice(0, 3);
+  await AsyncStorage.setItem(RECENT_PRAYERS_KEY, JSON.stringify(next));
+  return next;
 }

@@ -153,6 +153,9 @@ function store_audio_upload(string $field = 'audio_file'): ?string
     if ($_FILES[$field]['error'] !== UPLOAD_ERR_OK) {
         throw new RuntimeException('O envio do áudio falhou. Verifique o tamanho permitido pela hospedagem.');
     }
+    if ((int) $_FILES[$field]['size'] <= 0) {
+        throw new RuntimeException('O arquivo de áudio está vazio. Converta novamente ou escolha outro arquivo.');
+    }
     if ((int) $_FILES[$field]['size'] > 25 * 1024 * 1024) {
         throw new RuntimeException('O áudio deve ter no máximo 25 MB.');
     }
@@ -165,8 +168,13 @@ function store_audio_upload(string $field = 'audio_file'): ?string
         throw new RuntimeException('Não foi possível criar a pasta de áudios.');
     }
     $filename = date('YmdHis') . '-' . bin2hex(random_bytes(6)) . '.' . $extension;
-    if (!move_uploaded_file((string) $_FILES[$field]['tmp_name'], $directory . '/' . $filename)) {
+    $destination = $directory . '/' . $filename;
+    if (!move_uploaded_file((string) $_FILES[$field]['tmp_name'], $destination)) {
         throw new RuntimeException('Não foi possível salvar o arquivo de áudio.');
+    }
+    if (!is_file($destination) || filesize($destination) <= 0) {
+        @unlink($destination);
+        throw new RuntimeException('O áudio chegou vazio ao servidor. Converta novamente e repita o envio.');
     }
     return rtrim((string) config('app', 'base_url', ''), '/') . '/uploads/audio/' . $filename;
 }

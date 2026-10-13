@@ -52,6 +52,10 @@
       status.textContent = 'Escolha um arquivo de áudio primeiro.';
       return;
     }
+    if (source.size <= 0) {
+      status.textContent = 'O arquivo selecionado está vazio. Escolha outro áudio.';
+      return;
+    }
     if (source.size > 150 * 1024 * 1024) {
       status.textContent = 'O arquivo original deve ter no máximo 150 MB.';
       return;
@@ -84,6 +88,7 @@
       const result = await ffmpeg.readFile(outputName);
       if (!(result instanceof Uint8Array)) throw new Error('O conversor não retornou um áudio válido.');
       const converted = new File([result], `${safeBaseName(source.name)}.mp3`, { type: 'audio/mpeg' });
+      if (converted.size <= 0) throw new Error('A conversão gerou um arquivo vazio. Tente novamente com o áudio original.');
       if (converted.size > 25 * 1024 * 1024) throw new Error('O MP3 ainda ficou acima de 25 MB. Escolha 48 kbps e converta novamente.');
       const transfer = new DataTransfer();
       transfer.items.add(converted);
@@ -122,6 +127,12 @@
       if (container.dataset.processing === 'true') {
         event.preventDefault();
         status.textContent = 'Aguarde a conversão terminar antes de salvar.';
+        container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      if (file && file.size <= 0) {
+        event.preventDefault();
+        status.textContent = 'O áudio está vazio. Escolha ou converta o arquivo novamente.';
         container.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
