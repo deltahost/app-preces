@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@expo-google-fonts/poppins": "^0.4.1",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.27",
@@ -23,6 +24,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~57.0.2",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -34,7 +37,8 @@
     "doctor": "expo-doctor",
     "tts:setup": "python -m pip install -r server/requirements.txt",
     "tts:server": "python server/edge_tts_server.py",
-    "tts:server:azure": "node --env-file-if-exists=.env.tts server/tts-server.mjs"
+    "tts:server:azure": "node --env-file-if-exists=.env.tts server/tts-server.mjs",
+    "lint": "expo lint"
   },
   "private": true
 }

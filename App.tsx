@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { NarrationCancelledError, PlaybackPhase, speakNarration } from './src/se
 import { useFocusEffect } from 'expo-router';
 import { ContentCategory, ContentMediaCategory, loadPublishedContent, loadRecentPrayerIds, PublishedMedia, PublishedPrayer, recordPrayerAccess } from './src/services/content';
 import { DailyNarrationLimitError, playPrayerNarration } from './src/services/prayerNarration';
+import { Text } from './src/typography';
 
 type Tab='home'|'chat'|'videos'|'prayers'|'favorites'|'father';
 type Stored={dark:boolean;reminder:boolean;premium:boolean;subscription?:SubscriptionState|null;prayers:Prayer[]};

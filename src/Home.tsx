@@ -1,11 +1,12 @@
 import React from 'react';
-import { Alert, Dimensions, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Dimensions, ImageBackground, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { categories as localCategories, OUR_FATHER, Prayer, verses } from './data';
 import { Palette } from './theme';
 import { Icon, SectionTitle, shadow } from './ui';
 import { ContentCategory, PublishedPrayer } from './services/content';
+import { Text } from './typography';
 
 type Props={p:Palette;premium:boolean;prayers:Prayer[];contentCategories:ContentCategory[];publishedPrayers:PublishedPrayer[];recentPrayerIds:string[];goPremium:()=>void;openBibleChat:()=>void;speak:(t:string,v?:'female'|'male')=>void;openPrayer:(p:Prayer)=>void};
 

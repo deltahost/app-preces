@@ -176,7 +176,7 @@ export async function speakNarration(text: string, voice: NarrationVoice = 'fema
     clearTimeout(timeout);
     if (activeCancel === cancelRequest) activeCancel = null;
     await playAudioUrl(result.audioUrl, onPhase);
-  } catch (error) {
+  } catch {
     clearTimeout(timeout);
     if (activeCancel === cancelRequest) activeCancel = null;
     if (cancelled) throw new NarrationCancelledError();

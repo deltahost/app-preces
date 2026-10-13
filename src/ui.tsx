@@ -1,7 +1,8 @@
 import React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette } from './theme';
+import { Text } from './typography';
 
 export const shadow = Platform.select({ ios: { shadowColor:'#21160D',shadowOpacity:.08,shadowRadius:16,shadowOffset:{width:0,height:6}}, android:{elevation:3}, default:{} });
 

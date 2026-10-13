@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ImageBackground, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, ImageBackground, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { media as localMedia, OUR_FATHER, Prayer } from './data';
 import { ContentMediaCategory, PublishedMedia } from './services/content';
@@ -8,6 +8,7 @@ import { askBible, BibleChatError } from './services/bibleChat';
 import { PlaybackPhase, playAudioUrl, stopNarration } from './services/tts';
 import { Palette } from './theme';
 import { Icon, shadow } from './ui';
+import { Text, TextInput } from './typography';
 
 export function BibleChat({p,premium,goPremium,listen}:{p:Palette;premium:boolean;goPremium:()=>void;listen:(text:string,onPhase:(phase:PlaybackPhase)=>void)=>Promise<void>}){
  const [message,setMessage]=useState('');

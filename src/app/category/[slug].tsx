@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -11,6 +11,7 @@ import { Icon, shadow } from '../../ui';
 import { loadPublishedContent, PublishedPrayer, recordPrayerAccess } from '../../services/content';
 import { DailyNarrationLimitError, playPrayerNarration } from '../../services/prayerNarration';
 import { NarrationCancelledError, PlaybackPhase } from '../../services/tts';
+import { Text } from '../../typography';
 
 type StoredState = { dark?: boolean; premium?: boolean };
 
