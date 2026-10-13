@@ -31,6 +31,6 @@ O arquivo `config.php` é ignorado pelo Git e não deve ser enviado ao GitHub.
 
 Depois de entrar no painel, abra **Configurações** para cadastrar chaves novas de OpenAI, Google Gemini ou Pexels. As chaves são criptografadas no banco e nunca são devolvidas pela API. A conversa usa OpenAI e Gemini em ordem de prioridade e passa para a próxima chave quando encontra falha de cota, autenticação ou indisponibilidade. Pexels não participa desse rodízio; ele fica reservado para imagens.
 
-Cada chave é tentada no máximo uma vez por pergunta. A versão gratuita permite uma conversa diária por instalação, com uma proteção adicional por rede. O acesso Premium ilimitado dependerá da validação de compra no servidor quando o Google Play Billing for integrado.
+Cada chave é tentada no máximo uma vez por pergunta. A versão gratuita permite uma conversa diária por instalação, com uma proteção adicional por rede. Durante o protótipo, o estado Premium local libera conversas ilimitadas; esse sinal não é seguro para produção e deverá ser substituído pela validação de compra no servidor quando o Google Play Billing for integrado.
 
 Conteúdo Premium ainda é identificado pelo campo `is_premium`. A validação de assinatura será adicionada quando o sistema de compras for integrado.

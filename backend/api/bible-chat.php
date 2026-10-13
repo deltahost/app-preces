@@ -15,6 +15,7 @@ if (!is_array($payload)) {
 }
 $message = trim((string) ($payload['message'] ?? ''));
 $installationId = trim((string) ($payload['installationId'] ?? ''));
+$isPrototypePremium = filter_var($payload['premium'] ?? false, FILTER_VALIDATE_BOOLEAN);
 if (mb_strlen($message) < 3 || mb_strlen($message) > 800) {
     private_json_response(['error' => 'A pergunta deve ter entre 3 e 800 caracteres.'], 422);
 }
@@ -26,16 +27,18 @@ $clientIp = (string) ($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['REMOTE_ADDR
 $installationHash = hash('sha256', $installationId . '|' . $clientIp);
 $ipHash = hash('sha256', 'ip|' . $clientIp);
 $usage = db()->prepare('SELECT request_count FROM bible_chat_usage WHERE installation_hash=? AND usage_date=CURDATE()');
-$usage->execute([$installationHash]);
-if ((int) ($usage->fetchColumn() ?: 0) >= 1) {
-    private_json_response([
-        'error' => 'Você já usou sua conversa gratuita de hoje. O acesso é renovado amanhã.',
-        'code' => 'FREE_DAILY_LIMIT',
-    ], 429);
-}
-$usage->execute([$ipHash]);
-if ((int) ($usage->fetchColumn() ?: 0) >= 20) {
-    private_json_response(['error' => 'Muitas conversas foram solicitadas por esta rede hoje. Tente novamente amanhã.', 'code' => 'NETWORK_DAILY_LIMIT'], 429);
+if (!$isPrototypePremium) {
+    $usage->execute([$installationHash]);
+    if ((int) ($usage->fetchColumn() ?: 0) >= 1) {
+        private_json_response([
+            'error' => 'Você já usou sua conversa gratuita de hoje. O acesso é renovado amanhã.',
+            'code' => 'FREE_DAILY_LIMIT',
+        ], 429);
+    }
+    $usage->execute([$ipHash]);
+    if ((int) ($usage->fetchColumn() ?: 0) >= 20) {
+        private_json_response(['error' => 'Muitas conversas foram solicitadas por esta rede hoje. Tente novamente amanhã.', 'code' => 'NETWORK_DAILY_LIMIT'], 429);
+    }
 }
 
 $systemPrompt = <<<'PROMPT'
@@ -209,9 +212,11 @@ foreach ($credentials as $credential) {
             : gemini_answer($apiKey, $systemPrompt, $message);
         if ((int) $response['status'] >= 200 && (int) $response['status'] < 300 && $response['answer'] !== '') {
             db()->prepare('UPDATE api_credentials SET cooldown_until=NULL,failure_count=0,last_error=NULL,last_used_at=NOW() WHERE id=?')->execute([$credential['id']]);
-            db()->prepare('INSERT INTO bible_chat_usage (installation_hash,usage_date,request_count) VALUES (?,CURDATE(),1) ON DUPLICATE KEY UPDATE request_count=request_count+1')->execute([$installationHash]);
-            db()->prepare('INSERT INTO bible_chat_usage (installation_hash,usage_date,request_count) VALUES (?,CURDATE(),1) ON DUPLICATE KEY UPDATE request_count=request_count+1')->execute([$ipHash]);
-            private_json_response(['ok' => true, 'answer' => $response['answer'], 'provider' => $credential['provider']]);
+            if (!$isPrototypePremium) {
+                db()->prepare('INSERT INTO bible_chat_usage (installation_hash,usage_date,request_count) VALUES (?,CURDATE(),1) ON DUPLICATE KEY UPDATE request_count=request_count+1')->execute([$installationHash]);
+                db()->prepare('INSERT INTO bible_chat_usage (installation_hash,usage_date,request_count) VALUES (?,CURDATE(),1) ON DUPLICATE KEY UPDATE request_count=request_count+1')->execute([$ipHash]);
+            }
+            private_json_response(['ok' => true, 'answer' => $response['answer'], 'provider' => $credential['provider'], 'access' => $isPrototypePremium ? 'premium-prototype' : 'free']);
         }
         $error = provider_error_message($response);
         $seconds = credential_cooldown($response);

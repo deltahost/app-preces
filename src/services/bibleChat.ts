@@ -18,14 +18,14 @@ async function installationId(): Promise<string> {
   return created;
 }
 
-export async function askBible(message: string): Promise<string> {
+export async function askBible(message: string, premium = false): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 45000);
   try {
     const response = await fetch(`${CONTENT_API_URL}/bible-chat.php`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, installationId: await installationId() }),
+      body: JSON.stringify({ message, installationId: await installationId(), premium }),
       signal: controller.signal,
     });
     const responseText = await response.text();
