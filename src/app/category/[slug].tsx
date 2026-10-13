@@ -10,7 +10,7 @@ import { dark, light } from '../../theme';
 import { Icon, shadow } from '../../ui';
 import { loadPublishedContent, PublishedPrayer, recordPrayerAccess } from '../../services/content';
 import { DailyNarrationLimitError, playPrayerNarration } from '../../services/prayerNarration';
-import { PlaybackPhase } from '../../services/tts';
+import { NarrationCancelledError, PlaybackPhase } from '../../services/tts';
 
 type StoredState = { dark?: boolean; premium?: boolean };
 
@@ -58,6 +58,7 @@ export default function CategoryScreen() {
       await playPrayerNarration(prayer, premium, onPhase);
     } catch (error) {
       onPhase?.('idle');
+      if (error instanceof NarrationCancelledError) return;
       if (error instanceof DailyNarrationLimitError) {
         Alert.alert('Limite diário utilizado', 'Na versão gratuita você pode ouvir 1 oração por dia. Volte à tela inicial para conhecer o Premium.');
         return;

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Prayer } from '../data';
-import { PlaybackPhase, playAudioUrl, speakNarration } from './tts';
+import { NarrationCancelledError, PlaybackPhase, playAudioUrl, speakNarration } from './tts';
 
 const FREE_NARRATION_KEY = '@preces/free-narration-date-v2';
 
@@ -24,7 +24,8 @@ export async function playPrayerNarration(
   if (prayer.audioUrl) {
     try {
       await playAudioUrl(prayer.audioUrl, onPhase);
-    } catch {
+    } catch (error) {
+      if (error instanceof NarrationCancelledError) throw error;
       await speakNarration(prayer.text, 'female', 'pt-BR', onPhase);
     }
   } else {

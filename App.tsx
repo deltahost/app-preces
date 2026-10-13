@@ -9,7 +9,7 @@ import { Drawer, Premium, Reader } from './src/Overlays';
 import { initialPrayers, Prayer } from './src/data';
 import { dark, light } from './src/theme';
 import { Icon } from './src/ui';
-import { speakNarration } from './src/services/tts';
+import { NarrationCancelledError, speakNarration } from './src/services/tts';
 import { useFocusEffect } from 'expo-router';
 import { ContentCategory, ContentMediaCategory, loadPublishedContent, loadRecentPrayerIds, PublishedMedia, PublishedPrayer, recordPrayerAccess } from './src/services/content';
 import { DailyNarrationLimitError, playPrayerNarration } from './src/services/prayerNarration';
@@ -28,7 +28,7 @@ export default function App(){
  const setDark=(x:boolean)=>{setDarkMode(x);persist({dark:x})}; const setReminderSafe=(x:boolean)=>{setReminder(x);persist({reminder:x})};
  const speak=(text:string,voice:'male'|'female'='female')=>{void speakNarration(text,voice)};
  const listenPrayer=async(prayer:Prayer,onPhase?:Parameters<typeof playPrayerNarration>[2])=>{
-  try{await playPrayerNarration(prayer,premium,onPhase)}catch(error){onPhase?.('idle');if(error instanceof DailyNarrationLimitError){Alert.alert('Limite diário utilizado','Na versão gratuita você pode ouvir 1 oração por dia. Assine o Premium para ouvir sem limites.',[{text:'Agora não'},{text:'Ver Premium',onPress:()=>setPremiumOpen(true)}]);return}Alert.alert('Não foi possível reproduzir','Confira sua conexão e o link do áudio, depois tente novamente.')}
+  try{await playPrayerNarration(prayer,premium,onPhase)}catch(error){onPhase?.('idle');if(error instanceof NarrationCancelledError)return;if(error instanceof DailyNarrationLimitError){Alert.alert('Limite diário utilizado','Na versão gratuita você pode ouvir 1 oração por dia. Assine o Premium para ouvir sem limites.',[{text:'Agora não'},{text:'Ver Premium',onPress:()=>setPremiumOpen(true)}]);return}Alert.alert('Não foi possível reproduzir','Confira sua conexão e o link do áudio, depois tente novamente.')}
  };
  const openPrayer=async(prayer:Prayer)=>{setReader(prayer);if(prayer.id.startsWith('published-'))setRecentPrayerIds(await recordPrayerAccess(prayer.id))};
  const subscribe=(plan:'monthly'|'annual')=>{setPremium(true);persist({premium:true});setPremiumOpen(false);Alert.alert('Premium ativado',`Plano ${plan==='annual'?'anual':'mensal'} ativado neste protótipo.`)};

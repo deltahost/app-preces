@@ -5,6 +5,13 @@ export type NarrationVoice = 'female' | 'male';
 export type NarrationLocale = 'pt-BR' | 'en-US' | 'es-ES' | 'fr-FR' | 'it-IT';
 export type PlaybackPhase = 'idle' | 'loading' | 'playing' | 'error';
 
+export class NarrationCancelledError extends Error {
+  constructor() {
+    super('Narração interrompida.');
+    this.name = 'NarrationCancelledError';
+  }
+}
+
 export const NARRATION_PROFILES = {
   male: {
     label: 'Remy',
@@ -32,7 +39,8 @@ export const edgeVoiceNames: Record<NarrationLocale, Record<NarrationVoice, stri
 
 export async function speakOnDevice(text: string, voice: NarrationVoice = 'female', locale: NarrationLocale = 'pt-BR', onPhase?: (phase: PlaybackPhase) => void) {
   const profile = NARRATION_PROFILES[voice];
-  await Speech.stop();
+  await stopNarration();
+  activePhaseCallback = onPhase ?? null;
   onPhase?.('loading');
   await new Promise<void>((resolve, reject) => {
     Speech.speak(text, {
@@ -40,9 +48,9 @@ export async function speakOnDevice(text: string, voice: NarrationVoice = 'femal
       pitch: profile.localPitch,
       rate: 0.9,
       onStart: () => { onPhase?.('playing'); resolve(); },
-      onDone: () => onPhase?.('idle'),
-      onStopped: () => onPhase?.('idle'),
-      onError: error => { onPhase?.('error'); reject(error); },
+      onDone: () => { onPhase?.('idle'); activePhaseCallback = null; },
+      onStopped: () => { onPhase?.('idle'); activePhaseCallback = null; },
+      onError: error => { onPhase?.('error'); activePhaseCallback = null; reject(error); },
     });
   });
 }
@@ -61,12 +69,34 @@ export async function requestPremiumNarration(apiUrl: string, token: string | un
 
 let activePlayer: AudioPlayer | null = null;
 let activeSubscription: { remove: () => void } | null = null;
+let activePhaseCallback: ((phase: PlaybackPhase) => void) | null = null;
+let activeCancel: (() => void) | null = null;
+
+function releaseActivePlayer() {
+  activeSubscription?.remove();
+  activeSubscription = null;
+  if (activePlayer) {
+    activePlayer.pause();
+    activePlayer.remove();
+    activePlayer = null;
+  }
+}
+
+export async function stopNarration() {
+  const notify = activePhaseCallback;
+  const cancel = activeCancel;
+  activePhaseCallback = null;
+  activeCancel = null;
+  releaseActivePlayer();
+  await Speech.stop();
+  notify?.('idle');
+  cancel?.();
+}
 
 export async function playAudioUrl(audioUrl: string, onPhase?: (phase: PlaybackPhase) => void) {
-  await Speech.stop();
+  await stopNarration();
   await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'doNotMix' });
-  activeSubscription?.remove();
-  activePlayer?.remove();
+  activePhaseCallback = onPhase ?? null;
   onPhase?.('loading');
 
   const player = createAudioPlayer({ uri: audioUrl }, { downloadFirst: false, updateInterval: 250 });
@@ -74,8 +104,19 @@ export async function playAudioUrl(audioUrl: string, onPhase?: (phase: PlaybackP
 
   await new Promise<void>((resolve, reject) => {
     let started = false;
+    let settled = false;
+    activeCancel = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      reject(new NarrationCancelledError());
+    };
     const timeout = setTimeout(() => {
-      if (started) return;
+      if (started || settled) return;
+      settled = true;
+      activeCancel = null;
+      releaseActivePlayer();
+      activePhaseCallback = null;
       onPhase?.('error');
       reject(new Error('Tempo esgotado ao carregar o áudio.'));
     }, 15000);
@@ -83,19 +124,29 @@ export async function playAudioUrl(audioUrl: string, onPhase?: (phase: PlaybackP
     activeSubscription = player.addListener('playbackStatusUpdate', (status: AudioStatus) => {
       if (status.error) {
         clearTimeout(timeout);
+        activeCancel = null;
+        releaseActivePlayer();
+        activePhaseCallback = null;
         onPhase?.('error');
-        if (!started) reject(new Error(status.error));
+        if (!started && !settled) {
+          settled = true;
+          reject(new Error(status.error));
+        }
         return;
       }
       if (status.playing) {
         onPhase?.('playing');
         if (!started) {
           started = true;
+          settled = true;
+          activeCancel = null;
           clearTimeout(timeout);
           resolve();
         }
       } else if (status.didJustFinish) {
         onPhase?.('idle');
+        activePhaseCallback = null;
+        releaseActivePlayer();
       } else if (status.isBuffering && !started) {
         onPhase?.('loading');
       }
