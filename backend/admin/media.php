@@ -3,32 +3,6 @@ require_once __DIR__ . '/_layout.php';
 require_admin();
 ensure_media_schema();
 
-function uploaded_audio_url(): ?string
-{
-    if (empty($_FILES['audio_file']) || ($_FILES['audio_file']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
-        return null;
-    }
-    if ($_FILES['audio_file']['error'] !== UPLOAD_ERR_OK) {
-        throw new RuntimeException('O envio do áudio falhou. Verifique o tamanho permitido pela hospedagem.');
-    }
-    if ((int) $_FILES['audio_file']['size'] > 25 * 1024 * 1024) {
-        throw new RuntimeException('O áudio deve ter no máximo 25 MB.');
-    }
-    $extension = strtolower(pathinfo((string) $_FILES['audio_file']['name'], PATHINFO_EXTENSION));
-    if (!in_array($extension, ['mp3', 'm4a', 'aac', 'wav', 'ogg'], true)) {
-        throw new RuntimeException('Formato de áudio inválido. Use MP3, M4A, AAC, WAV ou OGG.');
-    }
-    $directory = dirname(__DIR__) . '/uploads/audio';
-    if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
-        throw new RuntimeException('Não foi possível criar a pasta de áudios.');
-    }
-    $filename = date('YmdHis') . '-' . bin2hex(random_bytes(6)) . '.' . $extension;
-    if (!move_uploaded_file((string) $_FILES['audio_file']['tmp_name'], $directory . '/' . $filename)) {
-        throw new RuntimeException('Não foi possível salvar o arquivo de áudio.');
-    }
-    return rtrim((string) config('app', 'base_url', ''), '/') . '/uploads/audio/' . $filename;
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = (string) ($_POST['action'] ?? 'save_item');
@@ -68,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $type = in_array($_POST['type'] ?? '', ['video', 'audio'], true) ? (string) $_POST['type'] : 'video';
     $sourceUrl = trim((string) ($_POST['source_url'] ?? ''));
     try {
-        $uploadedUrl = uploaded_audio_url();
+        $uploadedUrl = store_audio_upload();
         if ($uploadedUrl !== null) {
             $sourceUrl = $uploadedUrl;
         }
