@@ -34,6 +34,7 @@ export default function App(){
  const setPrayers=(x:Prayer[])=>{setPrayersRaw(x);persist({prayers:x})};
  const setDark=(x:boolean)=>{setDarkMode(x);persist({dark:x})}; const setReminderSafe=(x:boolean)=>{setReminder(x);persist({reminder:x})};
  const speak=(text:string,voice:'male'|'female'='female')=>{if(narrationPhase==='loading')return;void speakNarration(text,voice,'pt-BR',setNarrationPhase).catch(error=>{setNarrationPhase('idle');if(!(error instanceof NarrationCancelledError))Alert.alert('Narração indisponível','Não foi possível preparar a voz agora. Verifique sua conexão e tente novamente.')})};
+ const listenBibleAnswer=async(text:string,onPhase:(phase:PlaybackPhase)=>void)=>{const notify=(phase:PlaybackPhase)=>{setNarrationPhase(phase);onPhase(phase)};try{await speakNarration(text,'female','pt-BR',notify)}catch(error){notify('idle');if(!(error instanceof NarrationCancelledError))Alert.alert('Narração indisponível','Não foi possível preparar a voz agora. Verifique sua conexão e tente novamente.')}};
  const listenPrayer=async(prayer:Prayer,onPhase?:Parameters<typeof playPrayerNarration>[2])=>{
   const setPhase=onPhase??setNarrationPhase;
   try{await playPrayerNarration(prayer,premium,setPhase)}catch(error){setPhase('idle');if(error instanceof NarrationCancelledError)return;if(error instanceof DailyNarrationLimitError){Alert.alert('Limite diário utilizado','Na versão gratuita você pode ouvir 1 oração por dia. Assine o Premium para ouvir sem limites.',[{text:'Agora não'},{text:'Ver Premium',onPress:()=>setPremiumOpen(true)}]);return}Alert.alert('Não foi possível reproduzir','Confira sua conexão e o link do áudio, depois tente novamente.')}
@@ -54,7 +55,7 @@ export default function App(){
  return <SafeAreaView edges={['top','bottom','left','right']} style={[s.app,{backgroundColor:p.bg}]}><StatusBar style={darkMode?'light':'dark'}/><View style={s.header}><Pressable hitSlop={12} style={s.side} onPress={()=>setDrawer(true)}><Icon name="menu" color={p.text} size={27}/></Pressable><View style={s.logo}><Icon name="sparkles" size={18} color={p.gold}/><Text style={[s.logoText,{color:p.text}]}>Preces</Text></View><Pressable hitSlop={8} onPress={()=>setPremiumOpen(true)} style={[s.premiumTop,{borderColor:p.gold}]}><Icon name={premium?'diamond':'diamond-outline'} size={14} color={p.gold}/><Text style={[s.premiumText,{color:p.gold}]}>{premium?'PREMIUM':'ASSINAR'}</Text></Pressable></View>
  <View style={{flex:1}}>
   {tab==='home'&&<Home p={p} premium={premium} prayers={prayers} contentCategories={contentCategories} publishedPrayers={publishedPrayers} recentPrayerIds={recentPrayerIds} goPremium={()=>setPremiumOpen(true)} openBibleChat={()=>setTab('chat')} speak={speak} openPrayer={openPrayer}/>}
-  {tab==='chat'&&<BibleChat p={p} premium={premium} goPremium={()=>setPremiumOpen(true)}/>}
+  {tab==='chat'&&<BibleChat p={p} premium={premium} goPremium={()=>setPremiumOpen(true)} listen={listenBibleAnswer}/>}
   {tab==='videos'&&<Videos p={p} premium={premium} media={publishedMedia} categories={mediaCategories} goPremium={()=>setPremiumOpen(true)}/>}
   {tab==='prayers'&&<MyPrayers p={p} prayers={prayers} setPrayers={setPrayers} premium={premium} listen={listenPrayer}/>}
   {tab==='favorites'&&<Favorites p={p} prayers={prayers} open={openPrayer}/>}
