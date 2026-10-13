@@ -21,6 +21,9 @@ O arquivo `config.php` é ignorado pelo Git e não deve ser enviado ao GitHub.
 - `GET /api/prayers.php?category=protecao`
 - `GET /api/prayers.php?slug=oracao-da-manha`
 - `GET /api/prayers.php?featured=1&limit=10&page=1`
+- `GET /api/media.php`
+- `GET /api/media-categories.php`
+- `GET /api/media.php?type=video`
+- `GET /api/media.php?type=audio&category=meditacao`
 
 Conteúdo Premium ainda é identificado pelo campo `is_premium`. A validação de assinatura será adicionada quando o sistema de compras for integrado.
-

@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS prayers (
     excerpt VARCHAR(500) NULL,
     body MEDIUMTEXT NOT NULL,
     image_url VARCHAR(2048) NULL,
+    audio_url VARCHAR(2048) NULL,
     is_premium TINYINT(1) NOT NULL DEFAULT 0,
     is_featured TINYINT(1) NOT NULL DEFAULT 0,
     is_published TINYINT(1) NOT NULL DEFAULT 0,
@@ -43,6 +44,39 @@ CREATE TABLE IF NOT EXISTS prayers (
     CONSTRAINT fk_prayers_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
     INDEX idx_prayers_public (is_published, published_at, sort_order),
     INDEX idx_prayers_category (category_id, is_published)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS media_categories (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(120) NOT NULL UNIQUE,
+    description VARCHAR(500) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_media_categories_public (is_active, sort_order)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS media_items (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    category_id BIGINT UNSIGNED NULL,
+    type VARCHAR(16) NOT NULL,
+    title VARCHAR(180) NOT NULL,
+    slug VARCHAR(200) NOT NULL UNIQUE,
+    description TEXT NULL,
+    source_url VARCHAR(2048) NOT NULL,
+    thumbnail_url VARCHAR(2048) NULL,
+    duration_label VARCHAR(30) NULL,
+    is_premium TINYINT(1) NOT NULL DEFAULT 0,
+    is_published TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order INT NOT NULL DEFAULT 0,
+    published_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_media_category FOREIGN KEY (category_id) REFERENCES media_categories(id) ON DELETE SET NULL,
+    INDEX idx_media_public (type, is_published, published_at, sort_order),
+    INDEX idx_media_category (category_id, is_published)
 ) ENGINE=InnoDB;
 
 INSERT INTO categories (name, slug, icon, color, sort_order) VALUES

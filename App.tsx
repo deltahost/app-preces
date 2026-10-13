@@ -9,21 +9,27 @@ import { Drawer, Premium, Reader } from './src/Overlays';
 import { initialPrayers, Prayer } from './src/data';
 import { dark, light } from './src/theme';
 import { Icon } from './src/ui';
-import { speakNarration } from './src/services/tts';
-import { ContentCategory, loadPublishedContent, PublishedPrayer } from './src/services/content';
+import { playAudioUrl, speakNarration } from './src/services/tts';
+import { ContentCategory, ContentMediaCategory, loadPublishedContent, PublishedMedia, PublishedPrayer } from './src/services/content';
 
 type Tab='home'|'videos'|'prayers'|'favorites'|'father';
 type Stored={dark:boolean;reminder:boolean;premium:boolean;prayers:Prayer[]};
 const KEY='@preces/state';
+const FREE_NARRATION_KEY='@preces/free-narration-date';
 
 export default function App(){
- const [tab,setTab]=useState<Tab>('home'); const [darkMode,setDarkMode]=useState(false); const [drawer,setDrawer]=useState(false); const [premiumOpen,setPremiumOpen]=useState(false); const [premium,setPremium]=useState(false); const [reminder,setReminder]=useState(true); const [prayers,setPrayersRaw]=useState<Prayer[]>(initialPrayers); const [reader,setReader]=useState<Prayer|null>(null); const [contentCategories,setContentCategories]=useState<ContentCategory[]>([]); const [publishedPrayers,setPublishedPrayers]=useState<PublishedPrayer[]>([]); const p=darkMode?dark:light;
+ const [tab,setTab]=useState<Tab>('home'); const [darkMode,setDarkMode]=useState(false); const [drawer,setDrawer]=useState(false); const [premiumOpen,setPremiumOpen]=useState(false); const [premium,setPremium]=useState(false); const [reminder,setReminder]=useState(true); const [prayers,setPrayersRaw]=useState<Prayer[]>(initialPrayers); const [reader,setReader]=useState<Prayer|null>(null); const [contentCategories,setContentCategories]=useState<ContentCategory[]>([]); const [publishedPrayers,setPublishedPrayers]=useState<PublishedPrayer[]>([]); const [mediaCategories,setMediaCategories]=useState<ContentMediaCategory[]>([]); const [publishedMedia,setPublishedMedia]=useState<PublishedMedia[]>([]); const p=darkMode?dark:light;
  useEffect(()=>{AsyncStorage.getItem(KEY).then(raw=>{if(!raw)return;const x:Stored=JSON.parse(raw);setDarkMode(x.dark||false);setReminder(x.reminder??true);setPremium(x.premium||false);setPrayersRaw(x.prayers||initialPrayers)}).catch(()=>{})},[]);
- useEffect(()=>{loadPublishedContent().then(content=>{setContentCategories(content.categories);setPublishedPrayers(content.prayers)}).catch(()=>{})},[]);
+ useEffect(()=>{loadPublishedContent().then(content=>{setContentCategories(content.categories);setPublishedPrayers(content.prayers);setMediaCategories(content.mediaCategories);setPublishedMedia(content.media)}).catch(()=>{})},[]);
  const persist=(next:Partial<Stored>)=>AsyncStorage.setItem(KEY,JSON.stringify({dark:darkMode,reminder,premium,prayers,...next}));
  const setPrayers=(x:Prayer[])=>{setPrayersRaw(x);persist({prayers:x})};
  const setDark=(x:boolean)=>{setDarkMode(x);persist({dark:x})}; const setReminderSafe=(x:boolean)=>{setReminder(x);persist({reminder:x})};
  const speak=(text:string,voice:'male'|'female'='female')=>{void speakNarration(text,voice)};
+ const listenPrayer=async(prayer:Prayer)=>{
+  const today=new Date().toLocaleDateString('en-CA');
+  if(!premium&&await AsyncStorage.getItem(FREE_NARRATION_KEY)===today){Alert.alert('Limite diário utilizado','Na versão gratuita você pode ouvir 1 oração por dia. Assine o Premium para ouvir sem limites.',[{text:'Agora não'},{text:'Ver Premium',onPress:()=>setPremiumOpen(true)}]);return}
+  try{if(prayer.audioUrl)await playAudioUrl(prayer.audioUrl);else await speakNarration(prayer.text);if(!premium)await AsyncStorage.setItem(FREE_NARRATION_KEY,today)}catch{Alert.alert('Não foi possível reproduzir','Confira o link do áudio ou tente novamente.')}
+ };
  const subscribe=(plan:'monthly'|'annual')=>{setPremium(true);persist({premium:true});setPremiumOpen(false);Alert.alert('Premium ativado',`Plano ${plan==='annual'?'anual':'mensal'} ativado neste protótipo.`)};
  const reset=()=>Alert.alert('Reiniciar o app?','Suas preferências e orações pessoais serão apagadas.',[{text:'Cancelar'},{text:'Reiniciar',style:'destructive',onPress:async()=>{await AsyncStorage.removeItem(KEY);setPrayersRaw(initialPrayers);setPremium(false);setDarkMode(false);setReminder(true);setDrawer(false)}}]);
  const toggle=()=>{if(!reader)return;const updated={...reader,favorite:!reader.favorite};setReader(updated);if(prayers.some(x=>x.id===reader.id))setPrayers(prayers.map(x=>x.id===reader.id?updated:x))};
@@ -35,9 +41,9 @@ export default function App(){
   {key:'father',icon:'book-outline',active:'book',label:'Pai Nosso',main:false},
  ] as const,[]);
  return <SafeAreaView edges={['top','bottom','left','right']} style={[s.app,{backgroundColor:p.bg}]}><StatusBar style={darkMode?'light':'dark'}/><View style={s.header}><Pressable hitSlop={12} style={s.side} onPress={()=>setDrawer(true)}><Icon name="menu" color={p.text} size={27}/></Pressable><View style={s.logo}><Icon name="sparkles" size={18} color={p.gold}/><Text style={[s.logoText,{color:p.text}]}>Preces</Text></View><Pressable hitSlop={8} onPress={()=>setPremiumOpen(true)} style={[s.premiumTop,{borderColor:p.gold}]}><Icon name={premium?'diamond':'diamond-outline'} size={14} color={p.gold}/><Text style={[s.premiumText,{color:p.gold}]}>{premium?'PREMIUM':'ASSINAR'}</Text></Pressable></View>
- <View style={{flex:1}}>{tab==='home'&&<Home p={p} premium={premium} prayers={prayers} contentCategories={contentCategories} publishedPrayers={publishedPrayers} goPremium={()=>setPremiumOpen(true)} speak={speak} openPrayer={setReader}/>} {tab==='videos'&&<Videos p={p} premium={premium} goPremium={()=>setPremiumOpen(true)}/>} {tab==='prayers'&&<MyPrayers p={p} prayers={prayers} setPrayers={setPrayers} premium={premium} speak={speak}/>} {tab==='favorites'&&<Favorites p={p} prayers={prayers} open={setReader}/>} {tab==='father'&&<Father p={p} speak={speak}/>}</View>
+ <View style={{flex:1}}>{tab==='home'&&<Home p={p} premium={premium} prayers={prayers} contentCategories={contentCategories} publishedPrayers={publishedPrayers} goPremium={()=>setPremiumOpen(true)} speak={speak} openPrayer={setReader}/>} {tab==='videos'&&<Videos p={p} premium={premium} media={publishedMedia} categories={mediaCategories} goPremium={()=>setPremiumOpen(true)}/>} {tab==='prayers'&&<MyPrayers p={p} prayers={prayers} setPrayers={setPrayers} premium={premium} listen={listenPrayer}/>} {tab==='favorites'&&<Favorites p={p} prayers={prayers} open={setReader}/>} {tab==='father'&&<Father p={p} speak={speak}/>}</View>
  {!premium&&<BottomAd p={p}/>}<View style={[s.bottom,{backgroundColor:p.surface,borderColor:p.border}]}>{tabs.map(x=><TouchableOpacity key={x.key} activeOpacity={0.65} style={s.tab} onPress={()=>setTab(x.key)}>{x.main?<View style={[s.mainTab,{backgroundColor:p.primary,borderColor:p.surface}]}><Icon name={x.icon} size={31} color="#fff"/></View>:<Icon name={tab===x.key?x.active:x.icon} size={23} color={tab===x.key?p.primary:p.muted}/>}<Text numberOfLines={1} style={[s.tabLabel,{color:tab===x.key?p.primary:p.muted},x.main&&{marginTop:3}]}>{x.label}</Text></TouchableOpacity>)}</View>
- <Drawer visible={drawer} close={()=>setDrawer(false)} p={p} dark={darkMode} setDark={setDark} reminder={reminder} setReminder={setReminderSafe} goPremium={()=>setPremiumOpen(true)} reset={reset}/><Premium visible={premiumOpen} close={()=>setPremiumOpen(false)} p={p} onSubscribe={subscribe}/><Reader prayer={reader} close={()=>setReader(null)} p={p} premium={premium} speak={speak} toggle={toggle}/></SafeAreaView>
+ <Drawer visible={drawer} close={()=>setDrawer(false)} p={p} dark={darkMode} setDark={setDark} reminder={reminder} setReminder={setReminderSafe} goPremium={()=>setPremiumOpen(true)} reset={reset}/><Premium visible={premiumOpen} close={()=>setPremiumOpen(false)} p={p} onSubscribe={subscribe}/><Reader prayer={reader} close={()=>setReader(null)} p={p} premium={premium} listen={listenPrayer} toggle={toggle}/></SafeAreaView>
 }
 
 function BottomAd({p}:{p:typeof light}){

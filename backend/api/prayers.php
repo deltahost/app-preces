@@ -4,7 +4,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_response(['error' => 'Método não permitido.'], 405);
 }
 
-$baseSelect = 'SELECT p.id, p.title, p.slug, p.excerpt, p.body, p.image_url, p.is_premium, p.is_featured, p.sort_order, p.published_at, p.updated_at, c.name AS category_name, c.slug AS category_slug FROM prayers p LEFT JOIN categories c ON c.id=p.category_id';
+$baseSelect = 'SELECT p.id, p.title, p.slug, p.excerpt, p.body, p.image_url, p.audio_url, p.is_premium, p.is_featured, p.sort_order, p.published_at, p.updated_at, c.name AS category_name, c.slug AS category_slug FROM prayers p LEFT JOIN categories c ON c.id=p.category_id';
 $publicWhere = ' p.is_published=1 AND (p.published_at IS NULL OR p.published_at <= NOW())';
 
 if (!empty($_GET['id']) || !empty($_GET['slug'])) {
@@ -36,4 +36,3 @@ $sql = $baseSelect . ' WHERE ' . implode(' AND ', $where) . ' ORDER BY p.sort_or
 $statement = db()->prepare($sql);
 $statement->execute($params);
 json_response(['items' => $statement->fetchAll(), 'page' => $page, 'limit' => $limit]);
-

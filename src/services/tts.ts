@@ -49,6 +49,14 @@ export async function requestPremiumNarration(apiUrl: string, token: string | un
 
 let activePlayer: AudioPlayer | null = null;
 
+export async function playAudioUrl(audioUrl: string) {
+  await Speech.stop();
+  await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'doNotMix' });
+  activePlayer?.remove();
+  activePlayer = createAudioPlayer(audioUrl, { downloadFirst: true });
+  activePlayer.play();
+}
+
 export async function speakNarration(text: string, voice: NarrationVoice = 'female', locale: NarrationLocale = 'pt-BR') {
   const apiUrl = process.env.EXPO_PUBLIC_TTS_API_URL?.replace(/\/$/, '');
   if (!apiUrl) return speakOnDevice(text, voice, locale);
@@ -56,11 +64,7 @@ export async function speakNarration(text: string, voice: NarrationVoice = 'fema
   try {
     const demoToken = process.env.EXPO_PUBLIC_TTS_API_TOKEN;
     const result = await requestPremiumNarration(apiUrl, demoToken, text, voice, locale);
-    await Speech.stop();
-    await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'doNotMix' });
-    activePlayer?.remove();
-    activePlayer = createAudioPlayer(result.audioUrl, { downloadFirst: true });
-    activePlayer.play();
+    await playAudioUrl(result.audioUrl);
   } catch {
     await speakOnDevice(text, voice, locale);
   }

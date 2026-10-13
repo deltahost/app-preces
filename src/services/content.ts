@@ -21,9 +21,30 @@ export type PublishedPrayer = Prayer & {
   imageUrl?: string;
 };
 
+export type ContentMediaCategory = {
+  id: number;
+  name: string;
+  slug: string;
+};
+
+export type PublishedMedia = {
+  id: number;
+  type: 'video' | 'audio';
+  title: string;
+  slug: string;
+  description: string;
+  sourceUrl: string;
+  thumbnailUrl?: string;
+  duration: string;
+  categorySlug?: string;
+  premium: boolean;
+};
+
 export type PublishedContent = {
   categories: ContentCategory[];
   prayers: PublishedPrayer[];
+  mediaCategories: ContentMediaCategory[];
+  media: PublishedMedia[];
 };
 
 const localFallback: PublishedContent = {
@@ -35,6 +56,8 @@ const localFallback: PublishedContent = {
     color,
   })),
   prayers: [],
+  mediaCategories: [],
+  media: [],
 };
 
 async function requestJson(path: string) {
@@ -70,6 +93,26 @@ function mapPrayer(item: Record<string, unknown>): PublishedPrayer {
     premium: Number(item.is_premium) === 1,
     featured: Number(item.is_featured) === 1,
     imageUrl: item.image_url ? String(item.image_url) : undefined,
+    audioUrl: item.audio_url ? String(item.audio_url) : undefined,
+  };
+}
+
+function mapMediaCategory(item: Record<string, unknown>): ContentMediaCategory {
+  return { id: Number(item.id), name: String(item.name ?? ''), slug: String(item.slug ?? '') };
+}
+
+function mapMedia(item: Record<string, unknown>): PublishedMedia {
+  return {
+    id: Number(item.id),
+    type: item.type === 'audio' ? 'audio' : 'video',
+    title: String(item.title ?? ''),
+    slug: String(item.slug ?? ''),
+    description: String(item.description ?? ''),
+    sourceUrl: String(item.source_url ?? ''),
+    thumbnailUrl: item.thumbnail_url ? String(item.thumbnail_url) : undefined,
+    duration: String(item.duration_label ?? ''),
+    categorySlug: item.category_slug ? String(item.category_slug) : undefined,
+    premium: Number(item.is_premium) === 1,
   };
 }
 
@@ -79,9 +122,15 @@ export async function loadPublishedContent(): Promise<PublishedContent> {
       requestJson('categories.php'),
       requestJson('prayers.php?limit=100'),
     ]);
+    const [mediaCategoryPayload, mediaPayload] = await Promise.all([
+      requestJson('media-categories.php').catch(() => ({ items: [] })),
+      requestJson('media.php?limit=100').catch(() => ({ items: [] })),
+    ]);
     const content: PublishedContent = {
       categories: Array.isArray(categoryPayload.items) ? categoryPayload.items.map(mapCategory) : [],
       prayers: Array.isArray(prayerPayload.items) ? prayerPayload.items.map(mapPrayer) : [],
+      mediaCategories: Array.isArray(mediaCategoryPayload.items) ? mediaCategoryPayload.items.map(mapMediaCategory) : [],
+      media: Array.isArray(mediaPayload.items) ? mediaPayload.items.map(mapMedia) : [],
     };
     if (!content.categories.length) content.categories = localFallback.categories;
     await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(content));
@@ -90,7 +139,8 @@ export async function loadPublishedContent(): Promise<PublishedContent> {
     const cached = await AsyncStorage.getItem(CACHE_KEY);
     if (cached) {
       try {
-        return JSON.parse(cached) as PublishedContent;
+        const content = JSON.parse(cached) as Partial<PublishedContent>;
+        return { ...localFallback, ...content, mediaCategories: content.mediaCategories ?? [], media: content.media ?? [] };
       } catch {
         await AsyncStorage.removeItem(CACHE_KEY);
       }

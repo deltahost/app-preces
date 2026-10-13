@@ -97,6 +97,54 @@ function slugify(string $value): string
     return trim($value, '-') ?: 'conteudo-' . time();
 }
 
+function ensure_media_schema(): void
+{
+    db()->exec(<<<'SQL'
+CREATE TABLE IF NOT EXISTS media_categories (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(120) NOT NULL UNIQUE,
+    description VARCHAR(500) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_media_categories_public (is_active, sort_order)
+) ENGINE=InnoDB
+SQL);
+
+    db()->exec(<<<'SQL'
+CREATE TABLE IF NOT EXISTS media_items (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    category_id BIGINT UNSIGNED NULL,
+    type VARCHAR(16) NOT NULL,
+    title VARCHAR(180) NOT NULL,
+    slug VARCHAR(200) NOT NULL UNIQUE,
+    description TEXT NULL,
+    source_url VARCHAR(2048) NOT NULL,
+    thumbnail_url VARCHAR(2048) NULL,
+    duration_label VARCHAR(30) NULL,
+    is_premium TINYINT(1) NOT NULL DEFAULT 0,
+    is_published TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order INT NOT NULL DEFAULT 0,
+    published_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_media_category FOREIGN KEY (category_id) REFERENCES media_categories(id) ON DELETE SET NULL,
+    INDEX idx_media_public (type, is_published, published_at, sort_order),
+    INDEX idx_media_category (category_id, is_published)
+) ENGINE=InnoDB
+SQL);
+}
+
+function ensure_prayer_audio_schema(): void
+{
+    $statement = db()->query("SHOW COLUMNS FROM prayers LIKE 'audio_url'");
+    if (!$statement->fetch()) {
+        db()->exec('ALTER TABLE prayers ADD COLUMN audio_url VARCHAR(2048) NULL AFTER image_url');
+    }
+}
+
 function json_response(mixed $data, int $status = 200): never
 {
     http_response_code($status);
