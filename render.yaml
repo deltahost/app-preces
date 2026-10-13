@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: preces-edge-tts
+    runtime: python
+    plan: free
+    buildCommand: pip install -r server/requirements.txt
+    startCommand: python server/edge_tts_server.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: TTS_CACHE_TTL_SECONDS
+        value: 3600
+      - key: TTS_MAX_TEXT_LENGTH
+        value: 5000
+      - key: TTS_REQUEST_LIMIT
+        value: 20
+      - key: TTS_RATE_WINDOW_SECONDS
+        value: 600
