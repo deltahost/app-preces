@@ -8,7 +8,7 @@ import { Reader } from '../../Overlays';
 import { Prayer } from '../../data';
 import { dark, light } from '../../theme';
 import { Icon, shadow } from '../../ui';
-import { loadPublishedContent, PublishedPrayer, recordPrayerAccess } from '../../services/content';
+import { loadFavoritePrayerIds, loadPublishedContent, PublishedPrayer, recordPrayerAccess, togglePrayerFavorite } from '../../services/content';
 import { DailyNarrationLimitError, playPrayerNarration } from '../../services/prayerNarration';
 import { NarrationCancelledError, PlaybackPhase } from '../../services/tts';
 import { Text } from '../../typography';
@@ -27,14 +27,14 @@ export default function CategoryScreen() {
   const p = darkMode ? dark : light;
 
   useEffect(() => {
-    Promise.all([loadPublishedContent(), AsyncStorage.getItem('@preces/state')])
-      .then(([content, raw]) => {
+    Promise.all([loadPublishedContent(), AsyncStorage.getItem('@preces/state'), loadFavoritePrayerIds()])
+      .then(([content, raw, favoriteIds]) => {
         const state: StoredState = raw ? JSON.parse(raw) : {};
         setPremium(!!state.premium);
         setDarkMode(!!state.dark);
         const category = content.categories.find(item => item.slug === slug);
         setCategoryName(category?.name || 'Orações');
-        setPrayers(content.prayers.filter(prayer => prayer.categorySlug === slug));
+        setPrayers(content.prayers.filter(prayer => prayer.categorySlug === slug).map(prayer => ({ ...prayer, favorite: favoriteIds.includes(prayer.id) })));
       })
       .catch(() => Alert.alert('Não foi possível carregar', 'Confira sua conexão e tente novamente.'))
       .finally(() => setLoading(false));
@@ -66,6 +66,14 @@ export default function CategoryScreen() {
       }
       Alert.alert('Não foi possível reproduzir', 'Confira sua conexão e o link do áudio, depois tente novamente.');
     }
+  };
+
+  const toggleFavorite = async () => {
+    if (!reader) return;
+    const favoriteIds = await togglePrayerFavorite(reader.id);
+    const favorite = favoriteIds.includes(reader.id);
+    setReader({ ...reader, favorite });
+    setPrayers(current => current.map(prayer => prayer.id === reader.id ? { ...prayer, favorite } : prayer));
   };
 
   return (
@@ -111,7 +119,7 @@ export default function CategoryScreen() {
         </ScrollView>
       )}
 
-      <Reader prayer={reader} close={() => setReader(null)} p={p} premium={premium} listen={listen} toggle={() => {}} />
+      <Reader prayer={reader} close={() => setReader(null)} p={p} premium={premium} listen={listen} toggle={() => void toggleFavorite()} />
     </SafeAreaView>
   );
 }

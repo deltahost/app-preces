@@ -4,6 +4,7 @@ import { categories as localCategories, Prayer } from '../data';
 const CONTENT_API_URL = (process.env.EXPO_PUBLIC_CONTENT_API_URL ?? 'https://preces.criandoconteudo.com.br/api').replace(/\/$/, '');
 const CACHE_KEY = '@preces/published-content-v1';
 const RECENT_PRAYERS_KEY = '@preces/recent-prayers-v1';
+const FAVORITE_PRAYERS_KEY = '@preces/favorite-prayers-v1';
 
 export type ContentCategory = {
   id: number;
@@ -164,5 +165,24 @@ export async function recordPrayerAccess(prayerId: string): Promise<string[]> {
   const current = await loadRecentPrayerIds();
   const next = [prayerId, ...current.filter(id => id !== prayerId)].slice(0, 3);
   await AsyncStorage.setItem(RECENT_PRAYERS_KEY, JSON.stringify(next));
+  return next;
+}
+
+export async function loadFavoritePrayerIds(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(FAVORITE_PRAYERS_KEY);
+    const ids = raw ? JSON.parse(raw) : [];
+    return Array.isArray(ids) ? ids.filter(id => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function togglePrayerFavorite(prayerId: string): Promise<string[]> {
+  const current = await loadFavoritePrayerIds();
+  const next = current.includes(prayerId)
+    ? current.filter(id => id !== prayerId)
+    : [prayerId, ...current];
+  await AsyncStorage.setItem(FAVORITE_PRAYERS_KEY, JSON.stringify(next));
   return next;
 }

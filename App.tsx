@@ -11,7 +11,7 @@ import { dark, light } from './src/theme';
 import { Icon } from './src/ui';
 import { NarrationCancelledError, PlaybackPhase, speakNarration } from './src/services/tts';
 import { useFocusEffect } from 'expo-router';
-import { ContentCategory, ContentMediaCategory, loadPublishedContent, loadRecentPrayerIds, PublishedMedia, PublishedPrayer, recordPrayerAccess } from './src/services/content';
+import { ContentCategory, ContentMediaCategory, loadFavoritePrayerIds, loadPublishedContent, loadRecentPrayerIds, PublishedMedia, PublishedPrayer, recordPrayerAccess, togglePrayerFavorite } from './src/services/content';
 import { DailyNarrationLimitError, playPrayerNarration } from './src/services/prayerNarration';
 import { Text } from './src/typography';
 
@@ -26,11 +26,11 @@ function createSubscription(plan:'monthly'|'annual'):SubscriptionState{
 }
 
 export default function App(){
- const [tab,setTab]=useState<Tab>('home'); const [darkMode,setDarkMode]=useState(false); const [drawer,setDrawer]=useState(false); const [premiumOpen,setPremiumOpen]=useState(false); const [subscription,setSubscription]=useState<SubscriptionState|null>(null); const [reminder,setReminder]=useState(true); const [prayers,setPrayersRaw]=useState<Prayer[]>(initialPrayers); const [reader,setReader]=useState<Prayer|null>(null); const [contentCategories,setContentCategories]=useState<ContentCategory[]>([]); const [publishedPrayers,setPublishedPrayers]=useState<PublishedPrayer[]>([]); const [mediaCategories,setMediaCategories]=useState<ContentMediaCategory[]>([]); const [publishedMedia,setPublishedMedia]=useState<PublishedMedia[]>([]); const [recentPrayerIds,setRecentPrayerIds]=useState<string[]>([]); const [narrationPhase,setNarrationPhase]=useState<PlaybackPhase>('idle'); const p=darkMode?dark:light;
+ const [tab,setTab]=useState<Tab>('home'); const [darkMode,setDarkMode]=useState(false); const [drawer,setDrawer]=useState(false); const [premiumOpen,setPremiumOpen]=useState(false); const [subscription,setSubscription]=useState<SubscriptionState|null>(null); const [reminder,setReminder]=useState(true); const [prayers,setPrayersRaw]=useState<Prayer[]>(initialPrayers); const [reader,setReader]=useState<Prayer|null>(null); const [contentCategories,setContentCategories]=useState<ContentCategory[]>([]); const [publishedPrayers,setPublishedPrayers]=useState<PublishedPrayer[]>([]); const [mediaCategories,setMediaCategories]=useState<ContentMediaCategory[]>([]); const [publishedMedia,setPublishedMedia]=useState<PublishedMedia[]>([]); const [recentPrayerIds,setRecentPrayerIds]=useState<string[]>([]); const [favoritePrayerIds,setFavoritePrayerIds]=useState<string[]>([]); const [narrationPhase,setNarrationPhase]=useState<PlaybackPhase>('idle'); const p=darkMode?dark:light;
  const premium=!!subscription&&new Date(subscription.expiresAt).getTime()>Date.now();
  useEffect(()=>{AsyncStorage.getItem(KEY).then(async raw=>{if(!raw)return;const x:Stored=JSON.parse(raw);setDarkMode(x.dark||false);setReminder(x.reminder??true);setPrayersRaw(x.prayers||initialPrayers);if(x.subscription&&new Date(x.subscription.expiresAt).getTime()>Date.now()){setSubscription(x.subscription)}else if(x.premium&&!x.subscription){const migrated=createSubscription('monthly');setSubscription(migrated);await AsyncStorage.setItem(KEY,JSON.stringify({...x,premium:true,subscription:migrated}))}else if(x.subscription){await AsyncStorage.setItem(KEY,JSON.stringify({...x,premium:false,subscription:null}))}}).catch(()=>{})},[]);
  useEffect(()=>{loadPublishedContent().then(content=>{setContentCategories(content.categories);setPublishedPrayers(content.prayers);setMediaCategories(content.mediaCategories);setPublishedMedia(content.media)}).catch(()=>{})},[]);
- useFocusEffect(useCallback(()=>{loadRecentPrayerIds().then(setRecentPrayerIds).catch(()=>{})},[]));
+ useFocusEffect(useCallback(()=>{Promise.all([loadRecentPrayerIds(),loadFavoritePrayerIds()]).then(([recent,favorites])=>{setRecentPrayerIds(recent);setFavoritePrayerIds(favorites)}).catch(()=>{})},[]));
  const persist=(next:Partial<Stored>)=>AsyncStorage.setItem(KEY,JSON.stringify({dark:darkMode,reminder,premium,subscription,prayers,...next}));
  const setPrayers=(x:Prayer[])=>{setPrayersRaw(x);persist({prayers:x})};
  const setDark=(x:boolean)=>{setDarkMode(x);persist({dark:x})}; const setReminderSafe=(x:boolean)=>{setReminder(x);persist({reminder:x})};
@@ -40,11 +40,11 @@ export default function App(){
   const setPhase=onPhase??setNarrationPhase;
   try{await playPrayerNarration(prayer,premium,setPhase)}catch(error){setPhase('idle');if(error instanceof NarrationCancelledError)return;if(error instanceof DailyNarrationLimitError){Alert.alert('Limite diário utilizado','Na versão gratuita você pode ouvir 1 oração por dia. Assine o Premium para ouvir sem limites.',[{text:'Agora não'},{text:'Ver Premium',onPress:()=>setPremiumOpen(true)}]);return}Alert.alert('Não foi possível reproduzir','Confira sua conexão e o link do áudio, depois tente novamente.')}
  };
- const openPrayer=async(prayer:Prayer)=>{setReader(prayer);if(prayer.id.startsWith('published-'))setRecentPrayerIds(await recordPrayerAccess(prayer.id))};
+ const openPrayer=async(prayer:Prayer)=>{setReader({...prayer,favorite:prayer.id.startsWith('published-')?favoritePrayerIds.includes(prayer.id):prayer.favorite});if(prayer.id.startsWith('published-'))setRecentPrayerIds(await recordPrayerAccess(prayer.id))};
  const subscribe=(plan:'monthly'|'annual')=>{const next=createSubscription(plan);setSubscription(next);persist({premium:true,subscription:next});Alert.alert('Premium ativado',`Plano ${plan==='annual'?'anual':'mensal'} ativado neste protótipo.`)};
  const cancelRenewal=()=>{if(!subscription)return;const next={...subscription,autoRenew:false};setSubscription(next);persist({premium:true,subscription:next});Alert.alert('Renovação cancelada',`Seu acesso Premium continua disponível até ${new Date(next.expiresAt).toLocaleDateString('pt-BR')}. Não haverá uma nova cobrança automática.`)};
- const reset=()=>Alert.alert('Reiniciar o app?','Suas preferências, histórico e orações pessoais serão apagados.',[{text:'Cancelar'},{text:'Reiniciar',style:'destructive',onPress:async()=>{await AsyncStorage.multiRemove([KEY,'@preces/free-narration-date','@preces/free-narration-date-v2','@preces/recent-prayers-v1','@preces/bible-chat-history-v1']);setPrayersRaw(initialPrayers);setRecentPrayerIds([]);setSubscription(null);setDarkMode(false);setReminder(true);setDrawer(false)}}]);
- const toggle=()=>{if(!reader)return;const updated={...reader,favorite:!reader.favorite};setReader(updated);if(prayers.some(x=>x.id===reader.id))setPrayers(prayers.map(x=>x.id===reader.id?updated:x))};
+ const reset=()=>Alert.alert('Reiniciar o app?','Suas preferências, histórico e orações pessoais serão apagados.',[{text:'Cancelar'},{text:'Reiniciar',style:'destructive',onPress:async()=>{await AsyncStorage.multiRemove([KEY,'@preces/free-narration-date','@preces/free-narration-date-v2','@preces/recent-prayers-v1','@preces/favorite-prayers-v1','@preces/bible-chat-history-v1']);setPrayersRaw(initialPrayers);setRecentPrayerIds([]);setFavoritePrayerIds([]);setSubscription(null);setDarkMode(false);setReminder(true);setDrawer(false)}}]);
+ const toggle=async()=>{if(!reader)return;const updated={...reader,favorite:!reader.favorite};setReader(updated);if(reader.id.startsWith('published-')){setFavoritePrayerIds(await togglePrayerFavorite(reader.id));return}if(prayers.some(x=>x.id===reader.id))setPrayers(prayers.map(x=>x.id===reader.id?updated:x))};
  const tabs=useMemo(()=>[
   {key:'home',icon:'home-outline',active:'home',label:'Início',main:false},
   {key:'chat',icon:'chatbubble-ellipses-outline',active:'chatbubble-ellipses',label:'Conversar',main:false},
@@ -59,7 +59,7 @@ export default function App(){
   {tab==='chat'&&<BibleChat p={p} premium={premium} goPremium={()=>setPremiumOpen(true)} listen={listenBibleAnswer}/>}
   {tab==='videos'&&<Videos p={p} premium={premium} media={publishedMedia} categories={mediaCategories} goPremium={()=>setPremiumOpen(true)}/>}
   {tab==='prayers'&&<MyPrayers p={p} prayers={prayers} setPrayers={setPrayers} premium={premium} listen={listenPrayer}/>}
-  {tab==='favorites'&&<Favorites p={p} prayers={prayers} open={openPrayer}/>}
+  {tab==='favorites'&&<Favorites p={p} prayers={[...prayers,...publishedPrayers.filter(prayer=>favoritePrayerIds.includes(prayer.id)).map(prayer=>({...prayer,favorite:true}))]} open={openPrayer}/>}
   {tab==='father'&&<Father p={p} speak={speak}/>}
  </View>
  {!premium&&<BottomAd p={p}/>}<View style={[s.bottom,{backgroundColor:p.surface,borderColor:p.border}]}>{tabs.map(x=><TouchableOpacity key={x.key} activeOpacity={0.65} style={s.tab} onPress={()=>setTab(x.key)}>{x.main?<View style={[s.mainTab,{backgroundColor:p.primary,borderColor:p.surface}]}><Icon name={x.icon} size={31} color="#fff"/></View>:<Icon name={tab===x.key?x.active:x.icon} size={23} color={tab===x.key?p.primary:p.muted}/>}<Text numberOfLines={1} style={[s.tabLabel,{color:tab===x.key?p.primary:p.muted},x.main&&{marginTop:3}]}>{x.label}</Text></TouchableOpacity>)}</View>
