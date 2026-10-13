@@ -15,6 +15,24 @@ function bible_fail(string $message, array $params): never
     redirect(bible_path($params));
 }
 
+function parse_bible_verses(string $rawVerses): array
+{
+    $lines = preg_split('/\R/u', trim($rawVerses)) ?: [];
+    $parsed = [];
+    foreach ($lines as $lineNumber => $line) {
+        $line = trim($line);
+        if ($line === '') continue;
+        if (!preg_match('/^(\d+)\s*[.\-:|)]?\s+(.+)$/u', $line, $matches)) {
+            throw new RuntimeException('Não foi possível ler a linha ' . ($lineNumber + 1) . '. Use o formato: 1 Texto do versículo.');
+        }
+        $parsed[] = [(int) $matches[1], trim($matches[2])];
+    }
+    if (!$parsed) {
+        throw new RuntimeException('Nenhum versículo válido foi encontrado.');
+    }
+    return $parsed;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = (string) ($_POST['action'] ?? '');
@@ -71,7 +89,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($uploadedUrl !== null) {
                 $audioUrl = $uploadedUrl;
             }
+            $rawVerses = trim((string) ($_POST['verses_bulk'] ?? ''));
+            $parsedVerses = $rawVerses !== '' ? parse_bible_verses($rawVerses) : [];
             $values = [$bookId, $number, trim((string) ($_POST['title'] ?? '')), $audioUrl, isset($_POST['is_published']) ? 1 : 0];
+            db()->beginTransaction();
             if ($id > 0) {
                 $values[] = $id;
                 db()->prepare('UPDATE bible_chapters SET book_id=?, chapter_number=?, title=?, audio_url=?, is_published=? WHERE id=?')->execute($values);
@@ -80,7 +101,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 db()->prepare('INSERT INTO bible_chapters (book_id, chapter_number, title, audio_url, is_published) VALUES (?, ?, ?, ?, ?)')->execute($values);
                 $chapterId = (int) db()->lastInsertId();
             }
-            redirect(bible_path(['book' => $bookId, 'chapter' => $chapterId, 'ok' => 'Capítulo salvo.']));
+            if ($parsedVerses) {
+                $verseStatement = db()->prepare('INSERT INTO bible_verses (chapter_id, verse_number, verse_text, is_published) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE verse_text=VALUES(verse_text), is_published=VALUES(is_published)');
+                $published = isset($_POST['is_published']) ? 1 : 0;
+                foreach ($parsedVerses as [$verseNumber, $verseText]) {
+                    $verseStatement->execute([$chapterId, $verseNumber, $verseText, $published]);
+                }
+            }
+            db()->commit();
+            $message = $parsedVerses ? 'Capítulo e ' . count($parsedVerses) . ' versículos salvos.' : 'Capítulo salvo.';
+            redirect(bible_path(['book' => $bookId, 'chapter' => $chapterId, 'ok' => $message]));
         }
 
         if ($action === 'save_verse') {
@@ -113,19 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($chapterId <= 0 || $rawVerses === '') {
                 bible_fail('Cole ao menos um versículo para importar.', ['book' => $bookId, 'chapter' => $chapterId, 'import_verses' => 1]);
             }
-            $lines = preg_split('/\R/u', $rawVerses) ?: [];
-            $parsed = [];
-            foreach ($lines as $lineNumber => $line) {
-                $line = trim($line);
-                if ($line === '') continue;
-                if (!preg_match('/^(\d+)\s*[.\-:|)]?\s+(.+)$/u', $line, $matches)) {
-                    bible_fail('Não foi possível ler a linha ' . ($lineNumber + 1) . '. Use o formato: 1 Texto do versículo.', ['book' => $bookId, 'chapter' => $chapterId, 'import_verses' => 1]);
-                }
-                $parsed[] = [(int) $matches[1], trim($matches[2])];
-            }
-            if (!$parsed) {
-                bible_fail('Nenhum versículo válido foi encontrado.', ['book' => $bookId, 'chapter' => $chapterId, 'import_verses' => 1]);
-            }
+            $parsed = parse_bible_verses($rawVerses);
             db()->beginTransaction();
             $statement = db()->prepare('INSERT INTO bible_verses (chapter_id, verse_number, verse_text, is_published) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE verse_text=VALUES(verse_text), is_published=VALUES(is_published)');
             $published = isset($_POST['is_published']) ? 1 : 0;
@@ -152,6 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect(bible_path(['section' => 'glossary', 'ok' => 'Termo do glossário salvo.']));
         }
     } catch (RuntimeException $error) {
+        if (db()->inTransaction()) db()->rollBack();
         $returnParams = match ($action) {
             'save_book' => $id > 0 ? ['edit_book' => $id] : ['new_book' => 1],
             'save_chapter' => array_filter(['book' => $_POST['book_id'] ?? null, ($id > 0 ? 'edit_chapter' : 'new_chapter') => $id > 0 ? $id : 1]),
@@ -229,6 +248,11 @@ if (is_array($preserved)) {
     if ($action === 'save_verse') $editingVerse = array_merge($editingVerse ?: [], $preserved);
     if ($action === 'save_glossary') $editingGlossary = array_merge($editingGlossary ?: [], $preserved);
 }
+if ($editingChapter && !isset($editingChapter['verses_bulk'])) {
+    $statement = db()->prepare('SELECT verse_number, verse_text FROM bible_verses WHERE chapter_id=? ORDER BY verse_number');
+    $statement->execute([(int) $editingChapter['id']]);
+    $editingChapter['verses_bulk'] = implode("\n", array_map(static fn(array $verse): string => $verse['verse_number'] . ' ' . $verse['verse_text'], $statement->fetchAll()));
+}
 
 $showBookForm = isset($_GET['new_book']) || $editingBook;
 $showChapterForm = $selectedBook && (isset($_GET['new_chapter']) || $editingChapter);
@@ -281,6 +305,7 @@ admin_header('Bíblia Sagrada'); notice();
 <?php if ($selectedBook && !$selectedChapter): ?><div class="page-title"><div><h2><?= e($selectedBook['name']) ?></h2><p class="muted"><?= $selectedBook['testament'] === 'new' ? 'Novo Testamento' : 'Antigo Testamento' ?> · <?= count($chapters) ?> capítulos cadastrados</p></div><a class="button" href="?book=<?= $bookId ?>&new_chapter=1">Novo capítulo</a></div>
 <?php if ($showChapterForm): ?><section class="card" style="margin-bottom:18px"><h2><?= $editingChapter ? 'Editar capítulo' : 'Novo capítulo' ?></h2><form method="post" enctype="multipart/form-data" class="form-grid"><input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="save_chapter"><input type="hidden" name="id" value="<?= (int) ($editingChapter['id'] ?? 0) ?>"><input type="hidden" name="book_id" value="<?= $bookId ?>">
 <div><label>Número do capítulo</label><input name="chapter_number" type="number" min="1" required value="<?= (int) ($editingChapter['chapter_number'] ?? (count($chapters) + 1)) ?>"></div><div><label>Título opcional</label><input name="title" value="<?= e($editingChapter['title'] ?? '') ?>" placeholder="A criação do mundo"></div>
+<div class="full"><label>Texto e versículos do capítulo</label><textarea name="verses_bulk" placeholder="1 No princípio, Deus criou os céus e a terra.&#10;2 A terra estava sem forma e vazia.&#10;3 Deus disse: Haja luz."><?= e($editingChapter['verses_bulk'] ?? '') ?></textarea><small class="muted">Digite ou cole um versículo por linha, começando pelo número. Exemplo: 1 No princípio... Você poderá editar o áudio de cada versículo depois.</small></div>
 <div class="full"><label>URL do áudio do capítulo</label><input name="audio_url" type="url" value="<?= e($editingChapter['audio_url'] ?? '') ?>" placeholder="https://.../genesis-1.mp3"></div><div class="full" data-audio-converter><label>Enviar áudio completo do capítulo</label><input data-audio-file name="chapter_audio_file" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.webm"><div class="audio-tools"><select data-audio-quality><option value="48k">Econômica · 48 kbps</option><option value="64k" selected>Recomendada · 64 kbps</option><option value="96k">Alta · 96 kbps</option></select><button data-audio-convert class="button secondary" type="button">Converter e comprimir para MP3</button></div><div data-audio-progress class="audio-progress" hidden><span></span></div><span data-audio-status class="audio-status">Use uma URL existente ou envie a narração completa deste capítulo.</span></div>
 <label class="check"><input type="checkbox" name="is_published" <?= !empty($editingChapter['is_published']) ? 'checked' : '' ?>> Publicado no aplicativo</label><div class="full actions"><button class="button">Salvar capítulo</button><a class="button secondary" href="?book=<?= $bookId ?>">Cancelar</a></div></form></section><?php endif; ?>
 <div class="table-wrap"><table><thead><tr><th>Capítulo</th><th>Título</th><th>Versículos</th><th>Áudio</th><th>Status</th><th>Ações</th></tr></thead><tbody><?php if (!$chapters): ?><tr><td colspan="6" class="muted">Nenhum capítulo cadastrado.</td></tr><?php endif; ?><?php foreach ($chapters as $chapter): ?><tr><td><strong><?= (int) $chapter['chapter_number'] ?></strong></td><td><?= e($chapter['title']) ?></td><td><?= (int) $chapter['verse_count'] ?></td><td><?= $chapter['audio_url'] ? 'Disponível' : 'Sem áudio' ?></td><td><?= $chapter['is_published'] ? 'Publicado' : 'Rascunho' ?></td><td><div class="actions"><a class="button" href="?book=<?= $bookId ?>&chapter=<?= (int) $chapter['id'] ?>">Versículos</a><a class="button secondary" href="?book=<?= $bookId ?>&edit_chapter=<?= (int) $chapter['id'] ?>">Editar</a><form method="post" onsubmit="return confirm('Excluir este capítulo e seus versículos?')"><input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="delete_chapter"><input type="hidden" name="id" value="<?= (int) $chapter['id'] ?>"><input type="hidden" name="book_id" value="<?= $bookId ?>"><button class="button danger">Excluir</button></form></div></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
