@@ -4,7 +4,7 @@ const CONTENT_API_URL = (process.env.EXPO_PUBLIC_CONTENT_API_URL ?? 'https://pre
 const INSTALLATION_ID_KEY = '@preces/installation-id-v1';
 
 export class BibleChatError extends Error {
-  constructor(message: string, public code?: string) {
+  constructor(message: string, public code?: string, public status?: number) {
     super(message);
     this.name = 'BibleChatError';
   }
@@ -28,9 +28,14 @@ export async function askBible(message: string): Promise<string> {
       body: JSON.stringify({ message, installationId: await installationId() }),
       signal: controller.signal,
     });
-    const payload = await response.json().catch(() => ({})) as { answer?: string; error?: string; code?: string };
+    const responseText = await response.text();
+    const payload = (() => {
+      try { return JSON.parse(responseText) as { answer?: string; error?: string; code?: string }; }
+      catch { return {}; }
+    })();
     if (!response.ok || !payload.answer) {
-      throw new BibleChatError(payload.error ?? 'Não foi possível conversar agora.', payload.code);
+      const message = payload.error ?? `O servidor não conseguiu responder (erro ${response.status}).`;
+      throw new BibleChatError(message, payload.code, response.status);
     }
     return payload.answer;
   } catch (error) {
